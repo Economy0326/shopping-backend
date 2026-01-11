@@ -7,13 +7,17 @@ generator client {
   provider = "prisma-client-js"
 }
 
-/** roles */
+/**
+ * roles
+ */
 enum UserRole {
   user
   admin
 }
 
-/** 주문 상태 */
+/**
+ * 주문 상태
+ */
 enum OrderStatus {
   AWAITING_DEPOSIT
   DEPOSIT_CONFIRMED
@@ -22,7 +26,9 @@ enum OrderStatus {
   CANCELED
 }
 
-/** 반품 상태 */
+/**
+ * 반품 상태
+ */
 enum ReturnStatus {
   REQUESTED
   APPROVED
@@ -41,18 +47,18 @@ model User {
   role      UserRole @default(user)
   createdAt DateTime @default(now())
 
-  orders    Order[]
-  asks      Ask[]
-  replies   AskReply[]
+  orders  Order[]
+  asks    Ask[]
+  replies AskReply[]
 }
 
 /**
  * 카테고리 (slug 기반)
  */
 model Category {
-  id    Int    @id @default(autoincrement())
-  slug  String @unique // outer/top/bottom/acc/for-artist/look ...
-  name  String
+  id   Int    @id @default(autoincrement())
+  slug String @unique // outer/top/bottom/acc/for-artist/look ...
+  name String
 
   @@index([slug])
 }
@@ -62,25 +68,25 @@ model Category {
  * - categorySlug는 slug로 바로 필터링하기 위해 유지
  */
 model Product {
-  id               Int      @id @default(autoincrement())
-  categorySlug     String
-  name             String
-  price            Int?     // look은 내려줘도 프론트 미노출
-  description      String?
+  id           Int     @id @default(autoincrement())
+  categorySlug String
+  name         String
+  price        Int? // look은 내려줘도 프론트 미노출
+  description  String?
 
-  sizeGuideText     String?
-  productInfoText   String?
-  sizeGuideMdUrl    String?
-  productInfoMdUrl  String?
-  lookMdUrl         String?
+  sizeGuideText    String?
+  productInfoText  String?
+  sizeGuideMdUrl   String?
+  productInfoMdUrl String?
+  lookMdUrl        String?
 
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  images           ProductImage[]
-  options          ProductOption[]
-  variants         ProductVariant[]
+  images   ProductImage[]
+  options  ProductOption[]
+  variants ProductVariant[]
 
   @@index([categorySlug, createdAt])
 }
@@ -89,12 +95,12 @@ model Product {
  * 상품 이미지
  */
 model ProductImage {
-  id        Int      @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   productId Int
   url       String
-  sortOrder Int      @default(0)
+  sortOrder Int    @default(0)
 
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId, sortOrder])
 }
@@ -105,18 +111,20 @@ model ProductImage {
  * - 재고는 여기 두지 않고 Variant에서 관리
  */
 model ProductOption {
-  id         Int      @id @default(autoincrement())
-  productId  Int
-  groupKey   String   // "size" | "color"
-  label      String?  // "SIZE" | "COLOR"
-  value      String   // "M", "L", "black", "white" ...
-  sku        String?
-  priceDelta Int?
+  id            Int              @id @default(autoincrement())
+  productId     Int
+  groupKey      String // "size" | "color"
+  label         String? // "SIZE" | "COLOR"
+  value         String // "M", "L", "black", "white" ...
+  sku           String?
+  priceDelta    Int?
+  variantSizes  ProductVariant[] @relation("VariantSizeOption")
+  variantColors ProductVariant[] @relation("VariantColorOption")
 
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@index([productId, groupKey])
   @@unique([productId, groupKey, value]) // 같은 상품 내 중복 방지(원하면 제거 가능)
+  @@index([productId, groupKey])
 }
 
 /**
@@ -125,22 +133,24 @@ model ProductOption {
  * - 옵션이 하나만 있는 상품이면 다른 한쪽은 null 허용
  */
 model ProductVariant {
-  id           Int      @id @default(autoincrement())
-  productId    Int
+  id        Int @id @default(autoincrement())
+  productId Int
 
-  sizeOptionId Int?
+  sizeOptionId  Int?
   colorOptionId Int?
 
-  stock        Int      @default(0)
-  sku          String?
-  priceDelta   Int?
+  stock      Int     @default(0)
+  sku        String?
+  priceDelta Int?
 
-  product      Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  sizeOption   ProductOption? @relation("VariantSizeOption", fields: [sizeOptionId], references: [id])
-  colorOption  ProductOption? @relation("VariantColorOption", fields: [colorOptionId], references: [id])
+  product     Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sizeOption  ProductOption? @relation("VariantSizeOption", fields: [sizeOptionId], references: [id])
+  colorOption ProductOption? @relation("VariantColorOption", fields: [colorOptionId], references: [id])
 
-  @@index([productId])
+  orderItems OrderItem[]
+
   @@unique([productId, sizeOptionId, colorOptionId]) // 같은 조합 중복 방지
+  @@index([productId])
 }
 
 /**
@@ -166,15 +176,15 @@ model Order {
   address2      String
   memo          String?
 
-  paymentMethod String   // "BANK_TRANSFER"
+  paymentMethod String // "BANK_TRANSFER"
   depositor     String?
 
-  carrier       String?
-  trackingNo    String?
+  carrier    String?
+  trackingNo String?
 
-  grandTotal    Int
+  grandTotal Int
 
-  user       User       @relation(fields: [userId], references: [id])
+  user       User        @relation(fields: [userId], references: [id])
   items      OrderItem[]
   return     Return?
   refundLogs RefundLog[]
@@ -189,18 +199,18 @@ model Order {
  * - 스냅샷을 남겨야 상품명/가격이 바뀌어도 주문 내역이 안정적
  */
 model OrderItem {
-  id            Int    @id @default(autoincrement())
-  orderId       String
-  productId     Int
-  variantId     Int?     // look 상품 같은 옵션 없는 경우 null 가능(정책에 따라)
-  qty           Int
+  id        Int    @id @default(autoincrement())
+  orderId   String
+  productId Int
+  variantId Int? // look 상품 같은 옵션 없는 경우 null 가능(정책에 따라)
+  qty       Int
 
-  price         Int      // 주문 당시 단가 스냅샷
-  name          String   // 주문 당시 이름 스냅샷
+  price         Int // 주문 당시 단가 스냅샷
+  name          String // 주문 당시 이름 스냅샷
   thumbnailUrl  String?
   optionSummary String?
 
-  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   variant ProductVariant? @relation(fields: [variantId], references: [id])
 
   @@index([orderId])
@@ -218,7 +228,7 @@ model Return {
   memo      String?
   createdAt DateTime     @default(now())
 
-  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 }
 
 /**
@@ -231,7 +241,7 @@ model RefundLog {
   memo      String
   createdAt DateTime @default(now())
 
-  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId, createdAt])
 }
@@ -267,8 +277,8 @@ model Ask {
   status    String   @default("waiting") // waiting|answered
   createdAt DateTime @default(now())
 
-  user      User      @relation(fields: [userId], references: [id])
-  replies   AskReply[]
+  user    User       @relation(fields: [userId], references: [id])
+  replies AskReply[]
 }
 
 model AskReply {
@@ -279,6 +289,6 @@ model AskReply {
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  ask       Ask   @relation(fields: [askId], references: [id], onDelete: Cascade)
-  user      User? @relation(fields: [userId], references: [id])
+  ask  Ask   @relation(fields: [askId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
 }
