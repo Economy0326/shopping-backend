@@ -47,6 +47,8 @@ model User {
   role      UserRole @default(user)
   createdAt DateTime @default(now())
 
+  refreshTokenHash String?
+
   orders  Order[]
   asks    Ask[]
   replies AskReply[]
