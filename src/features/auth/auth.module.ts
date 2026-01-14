@@ -4,10 +4,11 @@ import { AuthController } from "./auth.controller";
 import { AuthService } from "./auth.service";
 import { JwtAccessStrategy } from "./strategies/jwt-access.strategy";
 import { JwtRefreshStrategy } from "./strategies/jwt-refresh.strategy";
+import { OptionalJwtAccessGuard } from "./guards/optional-jwt-access.guard";
 
 @Module({
   imports: [JwtModule.register({})],
   controllers: [AuthController],
-  providers: [AuthService, JwtAccessStrategy, JwtRefreshStrategy],
+  providers: [AuthService, JwtAccessStrategy, JwtRefreshStrategy,OptionalJwtAccessGuard],
 })
 export class AuthModule {}
