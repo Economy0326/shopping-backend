@@ -58,6 +58,15 @@ async function main() {
     },
   });
 
+  await prisma.systemPolicy.upsert({
+    where: { key: "faq" },
+    update: {},
+    create: {
+      key: "faq",
+      value: "FAQ를 준비 중입니다.\n\nQ: 배송은 얼마나 걸리나요?\nA: 입금 확인 후 1~3영업일 내 출고됩니다.",
+    },
+  });
+
   // 2) 관리자 계정 생성
   const adminEmail = "admin@example.com";
   const adminPw = "admin1234"; // 개발용. 배포 전 반드시 변경.

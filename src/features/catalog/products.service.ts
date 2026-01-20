@@ -92,27 +92,33 @@ export class ProductsService {
       throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} } as any);
     }
 
+    const isLook = p.categorySlug === "look";
+
     // optionGroups (UI용)
     const groupsMap = new Map<string, { key: string; label: string; options: any[] }>();
-    for (const opt of p.options) {
-      const key = opt.groupKey;
-      if (!groupsMap.has(key)) {
-        groupsMap.set(key, { key, label: opt.label ?? key.toUpperCase(), options: [] });
+    if (!isLook) {
+      for (const opt of p.options) {
+        const key = opt.groupKey;
+        if (!groupsMap.has(key)) {
+          groupsMap.set(key, { key, label: opt.label ?? key.toUpperCase(), options: [] });
+        }
+        groupsMap.get(key)!.options.push({ id: opt.id, value: opt.value });
       }
-      groupsMap.get(key)!.options.push({ id: opt.id, value: opt.value });
     }
 
     // variants (재고/주문 기준)
-    const variants = p.variants.map((v) => {
-      const optionIds = [v.sizeOptionId, v.colorOptionId].filter((x) => typeof x === "number") as number[];
-      return {
-        id: v.id,
-        optionIds,
-        stock: v.stock,
-        sku: v.sku,
-        priceDelta: v.priceDelta ?? 0,
-      };
-    });
+    const variants = isLook
+      ? []
+      : p.variants.map((v) => {
+          const optionIds = [v.sizeOptionId, v.colorOptionId].filter((x) => typeof x === "number") as number[];
+          return {
+            id: v.id,
+            optionIds,
+            stock: v.stock,
+            sku: v.sku,
+            priceDelta: v.priceDelta ?? 0,
+          };
+        });
 
     return {
       id: p.id,

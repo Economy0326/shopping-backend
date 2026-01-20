@@ -25,4 +25,7 @@ export const ERR = {
 
   // admin
   ADMIN_ONLY: { code: "ADMIN_ONLY", message: "관리자 권한이 필요합니다" },
+
+  // qna
+  ASK_LIMIT_EXCEEDED: { code: "ASK_LIMIT_EXCEEDED", message: "문의는 최대 3개까지 등록할 수 있습니다." },
 } as const;
