@@ -279,6 +279,8 @@ model Ask {
   status    String   @default("waiting") // waiting|answered
   createdAt DateTime @default(now())
 
+  deletedAt DateTime?
+
   user    User       @relation(fields: [userId], references: [id])
   replies AskReply[]
 }
