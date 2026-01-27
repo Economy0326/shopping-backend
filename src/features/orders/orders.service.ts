@@ -1,4 +1,10 @@
-import { ConflictException, ForbiddenException, HttpException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ConflictException,
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { ERR } from "../../shared/errors";
 import { makeId } from "../../shared/ids";
@@ -22,9 +28,15 @@ export class OrdersService {
     }
   }
 
+  // - receiver.address(zip/zipcode/address1/address2) 지원
+  // - payment.depositor 지원
+  // - items: variantId 우선, 없으면 optionIds 조합으로 variant 매칭
   async create(user: CurrentUser, dto: CreateOrderDto) {
     if (!dto.items?.length) {
-      throw new HttpException({ code: "VALIDATION_ERROR", message: "items가 비어있습니다", details: {} }, 400);
+      throw new HttpException(
+        { code: "VALIDATION_ERROR", message: "items가 비어있습니다", details: {} },
+        400
+      );
     }
 
     const now = new Date();
@@ -32,7 +44,72 @@ export class OrdersService {
     const orderId = makeId("O");
 
     return this.prisma.$transaction(async (tx) => {
-      // 1) items 검증 + 재고 hold (atomic)
+      // receiver address 정규화 (zip/zipcode 모두 허용)
+      const zip =
+        dto.receiver.address?.zip ??
+        dto.receiver.address?.zipcode ??
+        "";
+
+      if (!zip) {
+        throw new HttpException(
+          {
+            code: "VALIDATION_ERROR",
+            message: "receiver.address.zip(또는 zipcode)가 필요합니다",
+            details: {},
+          },
+          400
+        );
+      }
+
+      // item별 variantId 결정 (variantId 우선, 없으면 optionIds로 매칭)
+      for (const it of dto.items) {
+        if (it.variantId) continue;
+
+        const optionIds = it.optionIds ?? [];
+        if (optionIds.length === 0) {
+          throw new HttpException(
+            {
+              code: "VALIDATION_ERROR",
+              message: "variantId 또는 optionIds가 필요합니다",
+              details: { productId: it.productId },
+            },
+            400
+          );
+        }
+
+        // 현재 모델이 sizeOptionId + colorOptionId(또는 한쪽 null) 구조라
+        // optionIds 1~2개 케이스를 지원
+        const a = optionIds[0];
+        const b = optionIds[1];
+
+        const found = await tx.productVariant.findFirst({
+          where: {
+            productId: it.productId,
+            OR:
+              b == null
+                ? [
+                    { sizeOptionId: a, colorOptionId: null },
+                    { sizeOptionId: null, colorOptionId: a },
+                  ]
+                : [
+                    { sizeOptionId: a, colorOptionId: b },
+                    { sizeOptionId: b, colorOptionId: a },
+                  ],
+          },
+          select: { id: true },
+        });
+
+        if (!found) {
+          throw new NotFoundException({
+            ...ERR.VARIANT_NOT_FOUND,
+            details: { productId: it.productId, optionIds },
+          } as any);
+        }
+
+        it.variantId = found.id;
+      }
+
+      // items 검증 + 재고 hold (atomic)
       const productIds = Array.from(new Set(dto.items.map((i) => i.productId)));
       const products = await tx.product.findMany({
         where: { id: { in: productIds }, isActive: true },
@@ -41,17 +118,24 @@ export class OrdersService {
           name: true,
           price: true,
           categorySlug: true,
-          images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+          images: {
+            orderBy: { sortOrder: "asc" },
+            take: 1,
+            select: { url: true },
+          },
         },
       });
 
       const pMap = new Map(products.map((p) => [p.id, p]));
       if (products.length !== productIds.length) {
-        throw new NotFoundException({ ...ERR.NOT_FOUND, details: { what: "product" } } as any);
+        throw new NotFoundException({
+          ...ERR.NOT_FOUND,
+          details: { what: "product" },
+        } as any);
       }
 
       // variant 한번에 읽기
-      const variantIds = dto.items.map((i) => i.variantId);
+      const variantIds = dto.items.map((i) => i.variantId!);
       const variants = await tx.productVariant.findMany({
         where: { id: { in: variantIds } },
         select: {
@@ -65,9 +149,13 @@ export class OrdersService {
           colorOption: { select: { value: true } },
         },
       });
+
       const vMap = new Map(variants.map((v) => [v.id, v]));
       if (variants.length !== variantIds.length) {
-        throw new NotFoundException({ ...ERR.VARIANT_NOT_FOUND, details: {} } as any);
+        throw new NotFoundException({
+          ...ERR.VARIANT_NOT_FOUND,
+          details: {},
+        } as any);
       }
 
       const orderItemsData: any[] = [];
@@ -75,22 +163,33 @@ export class OrdersService {
 
       for (const it of dto.items) {
         const p = pMap.get(it.productId);
-        const v = vMap.get(it.variantId);
+        const v = vMap.get(it.variantId!);
 
-        if (!p || !v) throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} } as any);
-
-        // ✅ 서버 규칙: variant는 반드시 해당 product 소속
-        if (v.productId !== it.productId) {
-          throw new HttpException({ ...ERR.INVALID_VARIANT, details: { productId: it.productId, variantId: it.variantId } }, 400);
+        if (!p || !v) {
+          throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} } as any);
         }
 
-        // ✅ 재고 hold: stock >= qty 인 경우에만 decrement
+        // variant는 반드시 해당 product 소속
+        if (v.productId !== it.productId) {
+          throw new HttpException(
+            {
+              ...ERR.INVALID_VARIANT,
+              details: { productId: it.productId, variantId: it.variantId },
+            },
+            400
+          );
+        }
+
+        // 재고 hold: stock >= qty 인 경우에만 decrement
         const dec = await tx.productVariant.updateMany({
-          where: { id: it.variantId, stock: { gte: it.qty } },
+          where: { id: it.variantId!, stock: { gte: it.qty } },
           data: { stock: { decrement: it.qty } },
         });
         if (dec.count !== 1) {
-          throw new ConflictException({ ...ERR.OUT_OF_STOCK, details: { variantId: it.variantId } } as any);
+          throw new ConflictException({
+            ...ERR.OUT_OF_STOCK,
+            details: { variantId: it.variantId },
+          } as any);
         }
 
         const unit = (p.price ?? 0) + (v.priceDelta ?? 0);
@@ -111,7 +210,7 @@ export class OrdersService {
         });
       }
 
-      // 2) 주문 생성
+      // 주문 생성
       const order = await tx.order.create({
         data: {
           id: orderId,
@@ -123,12 +222,16 @@ export class OrdersService {
           receiverName: dto.receiver.name,
           receiverPhone: dto.receiver.phone,
           receiverEmail: dto.receiver.email ?? null,
-          zip: dto.receiver.zip,
-          address1: dto.receiver.address1,
-          address2: dto.receiver.address2,
-          memo: dto.memo ?? null,
+
+          zip,
+          address1: dto.receiver.address.address1,
+          address2: dto.receiver.address.address2,
+
+          // memo는 receiver.memo를 사용
+          memo: dto.receiver.memo ?? null,
 
           paymentMethod: dto.payment.method,
+          depositor: dto.payment.depositor ?? null,
           grandTotal,
 
           items: { create: orderItemsData },
@@ -167,8 +270,11 @@ export class OrdersService {
       status: o.status,
       createdAt: o.createdAt,
       expiresAt: o.expiresAt,
-      amounts: { grandTotal: o.grandTotal },
-      preview: { name: o.items?.[0]?.name ?? null, thumbnailUrl: o.items?.[0]?.thumbnailUrl ?? null },
+      amounts: { itemsTotal: o.grandTotal, shippingFee: 0, discountTotal: 0, grandTotal: o.grandTotal },
+      preview: {
+        name: o.items?.[0]?.name ?? null,
+        thumbnailUrl: o.items?.[0]?.thumbnailUrl ?? null,
+      },
     }));
 
     return { data, meta: { page, size, total } };
@@ -184,7 +290,9 @@ export class OrdersService {
         user: { select: { id: true } },
       },
     });
-    if (!order) throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
+    if (!order) {
+      throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
+    }
 
     this.ensureOwnerOrAdmin(user, order.userId);
 
@@ -252,8 +360,12 @@ export class OrdersService {
   }
 
   async cancelRequest(user: CurrentUser, id: string) {
-    const order = await this.prisma.order.findUnique({ where: { id }, include: { items: true } });
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { items: true },
+    });
     if (!order) throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
+
     this.ensureOwnerOrAdmin(user, order.userId);
 
     if (order.status === OrderStatus.CANCELED) return true;
@@ -282,8 +394,12 @@ export class OrdersService {
   }
 
   async returnRequest(user: CurrentUser, id: string, reason?: string) {
-    const order = await this.prisma.order.findUnique({ where: { id }, include: { return: true } });
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: { return: true },
+    });
     if (!order) throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
+
     this.ensureOwnerOrAdmin(user, order.userId);
 
     if (order.status !== OrderStatus.DELIVERED) {

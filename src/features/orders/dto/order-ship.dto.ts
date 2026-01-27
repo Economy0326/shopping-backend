@@ -1,3 +1,4 @@
+// 발송 등록
 import { IsOptional, IsString } from "class-validator";
 
 export class OrderShipDto {

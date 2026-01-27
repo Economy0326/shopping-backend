@@ -7,6 +7,7 @@ import {
   Param,
   Post,
   Put,
+  Patch,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -74,6 +75,12 @@ export class AdminProductsController {
   @Put(":id")
   @HttpCode(200)
   async update(@Param("id") id: string, @Body() dto: AdminUpsertProductDto) {
+    return this.upsertInternal(Number(id), dto);
+  }
+
+  @Patch(":id")
+  @HttpCode(200)
+  async patch(@Param("id") id: string, @Body() dto: AdminUpsertProductDto) {
     return this.upsertInternal(Number(id), dto);
   }
 

@@ -22,6 +22,7 @@ import { AsksModule } from "./features/qna/asks.module";
 
 // admin
 import { AdminModule } from "./features/admin/admin.module";
+import { UsersModule } from "./features/users/users.module";
 
 @Module({
   imports: [
@@ -37,8 +38,8 @@ import { AdminModule } from "./features/admin/admin.module";
 
     NoticesModule,
     AsksModule,
-
     AdminModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
