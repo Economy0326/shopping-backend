@@ -18,6 +18,7 @@ export class JwtAccessStrategy extends PassportStrategy(Strategy, "jwt-access") 
   }
 
   async validate(payload: AccessJwtPayload) {
+    console.log("✅ jwt-access validate payload:", payload);
     return payload;
   }
 }

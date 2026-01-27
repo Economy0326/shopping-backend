@@ -5,9 +5,10 @@ import { AuthService } from "./auth.service";
 import { JwtAccessStrategy } from "./strategies/jwt-access.strategy";
 import { JwtRefreshStrategy } from "./strategies/jwt-refresh.strategy";
 import { OptionalJwtAccessGuard } from "./guards/optional-jwt-access.guard";
+import { PassportModule } from "@nestjs/passport";
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [PassportModule.register({ defaultStrategy: "jwt-access" }),JwtModule.register({})],
   controllers: [AuthController],
   providers: [AuthService, JwtAccessStrategy, JwtRefreshStrategy,OptionalJwtAccessGuard],
 })

@@ -16,6 +16,7 @@ import { parsePageSize } from "../../shared/pagination";
 import { OrderShipDto } from "../orders/dto/order-ship.dto";
 import { OrderStatus, ReturnStatus } from "@prisma/client";
 import { ERR } from "../../shared/errors";
+import { OrderMapper } from "../orders/mappers/order.mapper";
 
 @UseGuards(JwtAccessGuard, AdminGuard)
 @Controller("admin/orders")
@@ -34,16 +35,30 @@ export class AdminOrdersController {
         take,
         select: {
           id: true,
-          userId: true,
           status: true,
           createdAt: true,
           expiresAt: true,
           grandTotal: true,
+
+          paymentMethod: true,
+          depositor: true,
+
+          receiverName: true,
+          receiverPhone: true,
+          receiverEmail: true,
+
+          carrier: true,
+          trackingNo: true,
+          shippedAt: true,
+          deliveredAt: true,
+
+          user: { select: { id: true, email: true, displayName: true, phone: true } },
         },
       }),
     ]);
 
-    return { data: rows, meta: { page, size, total } };
+    const data = rows.map((o) => OrderMapper.toAdminListItem(o as any));
+    return { data, meta: { page, size, total } };
   }
 
   @Get(":id")
@@ -51,13 +66,16 @@ export class AdminOrdersController {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
+        user: { select: { id: true, email: true, displayName: true, phone: true } },
         items: true,
         return: true,
         refundLogs: { orderBy: { createdAt: "desc" } },
       },
     });
+
     if (!order) throw new HttpException({ ...ERR.ORDER_NOT_FOUND, details: { id } }, 404);
-    return order;
+
+    return OrderMapper.toAdminDetail(order as any);
   }
 
   @Post(":id/deposit-confirm")
@@ -121,15 +139,6 @@ export class AdminOrdersController {
     return true;
   }
 
-  /**
-   * refund-log 규칙(명세):
-   * - 해당 주문에 return.status === APPROVED 존재 시
-   *   return.status -> REFUNDED
-   * - Orders.status 변경 없음
-   *
-   * Body는 명세에 없지만 실무적으로 필요하니 최소 형태:
-   * { amount: number, memo: string }
-   */
   @Post(":id/refund-log")
   @HttpCode(200)
   async refundLog(@Param("id") id: string, @Body() body: { amount: number; memo: string }) {

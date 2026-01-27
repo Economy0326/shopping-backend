@@ -9,6 +9,7 @@ export const ERR = {
   // common
   NOT_FOUND: { code: "NOT_FOUND", message: "리소스를 찾을 수 없습니다" },
   FORBIDDEN: { code: "FORBIDDEN", message: "권한이 없습니다" },
+  INVALID_TOKEN: { code: "INVALID_TOKEN", message: "토큰이 유효하지 않습니다" },
 
   // products/variants
   INVALID_VARIANT: { code: "INVALID_VARIANT", message: "요청한 variant가 올바르지 않습니다" },
