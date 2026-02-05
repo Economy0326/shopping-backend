@@ -3,6 +3,12 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { parsePageSize } from "../../shared/pagination";
 import { ERR } from "../../shared/errors";
 
+/**
+ * ✅ 최종 확정(유저 상품 상세 명세 1:1)
+ * - images: string[] (url 배열)
+ * - optionGroups: [{ key, label, options:[{ value, stock }] }]
+ * - optionId/variantId/variants는 유저 응답에서 제거
+ */
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -72,70 +78,86 @@ export class ProductsService {
         productInfoMdUrl: true,
         lookMdUrl: true,
 
-        images: { orderBy: { sortOrder: "asc" }, select: { id: true, url: true, sortOrder: true } },
-        options: { orderBy: { id: "asc" }, select: { id: true, groupKey: true, label: true, value: true } },
+        images: { orderBy: { sortOrder: "asc" }, select: { url: true } },
+
+        // optionGroups 구성(내부용): id는 응답에 내보내지 않음
+        options: {
+          orderBy: { id: "asc" },
+          select: { id: true, groupKey: true, label: true, value: true },
+        },
+
+        // stock 계산(내부용): 응답에 variants는 내보내지 않음
         variants: {
           orderBy: { id: "asc" },
-          select: {
-            id: true,
-            stock: true,
-            sku: true,
-            priceDelta: true,
-            sizeOptionId: true,
-            colorOptionId: true,
-          },
+          select: { stock: true, sizeOptionId: true, colorOptionId: true },
         },
       },
     });
 
-    if (!p || p.categorySlug == null) {
+    if (!p || !p.categorySlug) {
       throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} } as any);
     }
 
     const isLook = p.categorySlug === "look";
 
-    // optionGroups (UI용)
-    const groupsMap = new Map<string, { key: string; label: string; options: any[] }>();
+    // ✅ images: string[]
+    const images = (p.images || []).map((im) => im.url);
+
+    // ✅ option stock 계산 정책(운영 단순/안정)
+    // - 해당 옵션이 포함된 모든 variant stock 합(sum)
+    const optionStockSum = new Map<number, number>();
+    if (!isLook) {
+      for (const v of p.variants) {
+        const stock = Number(v.stock) || 0;
+        if (v.sizeOptionId != null) {
+          optionStockSum.set(v.sizeOptionId, (optionStockSum.get(v.sizeOptionId) ?? 0) + stock);
+        }
+        if (v.colorOptionId != null) {
+          optionStockSum.set(v.colorOptionId, (optionStockSum.get(v.colorOptionId) ?? 0) + stock);
+        }
+      }
+    }
+
+    // ✅ optionGroups: value + stock만
+    const groupsMap = new Map<
+      string,
+      { key: string; label: string; options: Array<{ value: string; stock: number }> }
+    >();
+
     if (!isLook) {
       for (const opt of p.options) {
         const key = opt.groupKey;
         if (!groupsMap.has(key)) {
-          groupsMap.set(key, { key, label: opt.label ?? key.toUpperCase(), options: [] });
+          groupsMap.set(key, {
+            key,
+            label: opt.label ?? key.toUpperCase(),
+            options: [],
+          });
         }
-        groupsMap.get(key)!.options.push({ id: opt.id, value: opt.value });
+        groupsMap.get(key)!.options.push({
+          value: opt.value,
+          stock: optionStockSum.get(opt.id) ?? 0,
+        });
       }
     }
 
-    // variants (재고/주문 기준)
-    const variants = isLook
-      ? []
-      : p.variants.map((v) => {
-          const optionIds = [v.sizeOptionId, v.colorOptionId].filter((x) => typeof x === "number") as number[];
-          return {
-            id: v.id,
-            optionIds,
-            stock: v.stock,
-            sku: v.sku,
-            priceDelta: v.priceDelta ?? 0,
-          };
-        });
-
     return {
-      id: p.id,
-      categorySlug: p.categorySlug,
-      name: p.name,
-      price: p.price ?? 0,
-      description: p.description,
+      data: {
+        id: p.id,
+        categorySlug: p.categorySlug,
+        name: p.name,
+        price: p.price ?? 0,
+        description: p.description,
 
-      sizeGuideText: p.sizeGuideText,
-      productInfoText: p.productInfoText,
-      sizeGuideMdUrl: p.sizeGuideMdUrl,
-      productInfoMdUrl: p.productInfoMdUrl,
-      lookMdUrl: p.lookMdUrl,
+        sizeGuideText: p.sizeGuideText,
+        productInfoText: p.productInfoText,
+        sizeGuideMdUrl: p.sizeGuideMdUrl,
+        productInfoMdUrl: p.productInfoMdUrl,
+        lookMdUrl: p.lookMdUrl,
 
-      images: p.images,
-      optionGroups: Array.from(groupsMap.values()),
-      variants,
+        images,
+        optionGroups: Array.from(groupsMap.values()),
+      },
     };
   }
 }

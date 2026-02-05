@@ -10,6 +10,22 @@ import {
   ValidateNested,
 } from "class-validator";
 
+/**
+ * ✅ 최종 확정(레거시 제거)
+ * - 주문 items는 optionValues 기반만 허용
+ * - variantId / optionIds는 프론트/유저 영역에서 아예 사용하지 않음
+ */
+class OptionValuesDto {
+  // 상품에 size 옵션이 없을 수 있으니 optional (ex: color만 있는 상품)
+  @IsOptional()
+  @IsString()
+  size?: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+}
+
 class OrderItemDto {
   @IsInt()
   productId!: number;
@@ -18,16 +34,10 @@ class OrderItemDto {
   @Min(1)
   qty!: number;
 
-  // variantId 우선 (있으면 그대로 사용)
-  @IsOptional()
-  @IsInt()
-  variantId?: number;
-
-  // variantId 없으면 optionIds 조합으로 매칭
-  @IsOptional()
-  @IsArray()
-  @IsInt({ each: true })
-  optionIds?: number[];
+  // ✅ value(string) 기반 옵션
+  @ValidateNested()
+  @Type(() => OptionValuesDto)
+  optionValues!: OptionValuesDto;
 }
 
 class AddressDto {

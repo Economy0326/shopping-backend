@@ -1,4 +1,9 @@
-import { ForbiddenException, HttpException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  HttpException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { parsePageSize } from "../../shared/pagination";
 import { makeId } from "../../shared/ids";
@@ -10,6 +15,12 @@ import { ERR } from "../../shared/errors";
 export class AsksService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private userId(user: CurrentUser): number | null {
+    const v = (user as any)?.sub;
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
   private isAdmin(user: CurrentUser) {
     return String((user as any)?.role ?? "").toLowerCase() === "admin";
   }
@@ -19,9 +30,16 @@ export class AsksService {
 
     const where: any = { deletedAt: null };
 
-    // ✅ user는 본인만, admin은 전체
+    // user는 본인만, admin은 전체
     if (!this.isAdmin(user)) {
-      where.userId = (user as any).sub; // 타입 불일치 가능 → Prisma 스키마에 맞춰 필요하면 Number(...)로
+      const uid = this.userId(user);
+      if (uid === null) {
+        throw new ForbiddenException({
+          ...ERR.FORBIDDEN,
+          details: { reason: "Invalid_token_sub" },
+        } as any);
+      }
+      where.userId = uid;
     }
 
     // status filter
@@ -86,10 +104,16 @@ export class AsksService {
     }
 
     const isAdmin = this.isAdmin(user);
-    const userSub = (user as any).sub;
+    const uid = this.userId(user);
+    if (uid === null) {
+      throw new ForbiddenException({
+        ...ERR.FORBIDDEN,
+        details: { reason: "Invalid_token_sub" },
+      } as any);
+    }
 
-    // ✅ 유저는 본인 글만
-    if (!isAdmin && String(row.userId) !== String(userSub)) {
+    // 유저는 본인 글만
+    if (!isAdmin && row.userId !== uid) {
       throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
     }
 
@@ -106,10 +130,16 @@ export class AsksService {
   }
 
   async create(user: CurrentUser, dto: { title: string; body: string }) {
-    const userSub = (user as any).sub;
+    const uid = this.userId(user);
+    if (uid === null) {
+      throw new ForbiddenException({
+        ...ERR.FORBIDDEN,
+        details: { reason: "Invalid_token_sub" },
+      } as any);
+    }
 
     const cnt = await this.prisma.ask.count({
-      where: { userId: userSub, deletedAt: null },
+      where: { userId: uid, deletedAt: null },
     });
 
     if (cnt >= 3) {
@@ -120,7 +150,7 @@ export class AsksService {
     const created = await this.prisma.ask.create({
       data: {
         id,
-        userId: userSub,
+        userId: uid,
         title: dto.title,
         body: dto.body,
         status: "waiting",
@@ -129,7 +159,7 @@ export class AsksService {
       select: { id: true },
     });
 
-    return created;
+    return { id: created.id };
   }
 
   async reply(admin: CurrentUser, askId: string, body: string) {
@@ -146,14 +176,20 @@ export class AsksService {
     }
 
     const id = makeId("r");
-    const adminSub = (admin as any).sub;
+    const adminId = this.userId(admin);
+    if (adminId === null) {
+      throw new ForbiddenException({
+        ...ERR.FORBIDDEN,
+        details: { reason: "Invalid_token_sub" },
+      } as any);
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.askReply.create({
         data: {
           id,
           askId,
-          userId: adminSub,
+          userId: adminId,
           body,
           isAdmin: true,
         },
@@ -179,9 +215,15 @@ export class AsksService {
     }
 
     const isAdmin = this.isAdmin(user);
-    const userSub = (user as any).sub;
+    const uid = this.userId(user);
+    if (uid === null) {
+      throw new ForbiddenException({
+        ...ERR.FORBIDDEN,
+        details: { reason: "Invalid_token_sub" },
+      } as any);
+    }
 
-    if (!isAdmin && String(ask.userId) !== String(userSub)) {
+    if (!isAdmin && ask.userId !== uid) {
       throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
     }
 

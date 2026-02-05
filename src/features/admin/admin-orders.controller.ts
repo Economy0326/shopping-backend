@@ -12,53 +12,24 @@ import {
 import { JwtAccessGuard } from "../auth/guards/jwt-access.guard";
 import { AdminGuard } from "../../shared/guards/admin.guard";
 import { PrismaService } from "../../prisma/prisma.service";
-import { parsePageSize } from "../../shared/pagination";
 import { OrderShipDto } from "../orders/dto/order-ship.dto";
 import { OrderStatus, ReturnStatus } from "@prisma/client";
 import { ERR } from "../../shared/errors";
 import { OrderMapper } from "../orders/mappers/order.mapper";
+import { AdminOrdersService } from "./admin-orders.service"; // ✅ 추가
 
 @UseGuards(JwtAccessGuard, AdminGuard)
 @Controller("admin/orders")
 export class AdminOrdersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly adminOrdersService: AdminOrdersService, // ✅ 추가
+  ) {}
 
   @Get()
   async list(@Query() query: any) {
-    const { page, size, skip, take } = parsePageSize(query, 20, 100);
-
-    const [total, rows] = await this.prisma.$transaction([
-      this.prisma.order.count({}),
-      this.prisma.order.findMany({
-        orderBy: { createdAt: "desc" },
-        skip,
-        take,
-        select: {
-          id: true,
-          status: true,
-          createdAt: true,
-          expiresAt: true,
-          grandTotal: true,
-
-          paymentMethod: true,
-          depositor: true,
-
-          receiverName: true,
-          receiverPhone: true,
-          receiverEmail: true,
-
-          carrier: true,
-          trackingNo: true,
-          shippedAt: true,
-          deliveredAt: true,
-
-          user: { select: { id: true, email: true, displayName: true, phone: true } },
-        },
-      }),
-    ]);
-
-    const data = rows.map((o) => OrderMapper.toAdminListItem(o as any));
-    return { data, meta: { page, size, total } };
+    // 필터/검색 로직은 service로
+    return this.adminOrdersService.list(query);
   }
 
   @Get(":id")
