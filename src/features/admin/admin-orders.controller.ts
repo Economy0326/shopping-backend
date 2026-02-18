@@ -77,13 +77,22 @@ export class AdminOrdersController {
       throw new HttpException({ ...ERR.INVALID_ORDER_STATUS, details: { status: o.status } }, 400);
     }
 
+    // carrier 표준화해서 저장 (대소문자/공백/하이픈 흡수)
+    const carrier = String(dto?.carrier ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s|-/g, "_");
+
+    // trackingNo도 trim해서 저장(공백만 들어오는 케이스 방지)
+    const trackingNo = String(dto?.trackingNo ?? "").trim();
+
     await this.prisma.order.update({
       where: { id },
       data: {
         status: OrderStatus.SHIPPED,
         shippedAt: new Date(),
-        carrier: dto.carrier ?? null,
-        trackingNo: dto.trackingNo ?? null,
+        carrier: carrier || null, 
+        trackingNo: trackingNo || null,
       },
     });
 

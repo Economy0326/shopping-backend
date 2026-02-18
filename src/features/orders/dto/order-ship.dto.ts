@@ -1,7 +1,15 @@
 // 발송 등록
-import { IsOptional, IsString } from "class-validator";
+import { IsIn, IsNotEmpty, IsString } from "class-validator"; 
+import { ShippingCarriers } from "../../../shared/constants/shippingCarriers"; 
 
 export class OrderShipDto {
-  @IsOptional() @IsString() carrier?: string;
-  @IsOptional() @IsString() trackingNo?: string;
+  @IsNotEmpty() // (필수)
+  @IsString()
+  @IsIn(Object.values(ShippingCarriers)) // 허용값만
+  carrier!: string; 
+
+  @IsNotEmpty() // (필수)
+  @IsString()
+  trackingNo!: string;
 }
+

@@ -21,7 +21,7 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new ResponseTransformInterceptor());
 
-  // ✅ 정적 파일: public 폴더를 루트로 제공
+  // 정적 파일: public 폴더를 루트로 제공
   app.use(express.static(path.join(process.cwd(), "public")));
 
   const port = Number(process.env.PORT ?? 8080);
