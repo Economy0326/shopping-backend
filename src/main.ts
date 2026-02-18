@@ -13,7 +13,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix("api/v1");
 
-  const origin = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+  const originEnv = process.env.CORS_ORIGIN ?? "http://localhost:3000";
+  const origin = originEnv.includes(",")
+    ? originEnv.split(",").map((s) => s.trim())
+    : originEnv;
+
   app.enableCors({ origin, credentials: true });
 
   app.use(cookieParser());
@@ -26,6 +30,6 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 8080);
   await app.listen(port);
-  console.log(`🚀 API running on http://localhost:${port}/api/v1`);
+  console.log(`🚀 API running on port ${port} (prefix: /api/v1)`);
 }
 bootstrap();
