@@ -10,6 +10,7 @@ import { makeId } from "../../shared/ids";
 import { emailToName } from "../../shared/name";
 import type { CurrentUser } from "../../shared/current-user";
 import { ERR } from "../../shared/errors";
+import { AskStatus } from "@prisma/client";
 
 @Injectable()
 export class AsksService {
@@ -42,9 +43,16 @@ export class AsksService {
       where.userId = uid;
     }
 
-    // status filter
-    const status = (query?.status ?? "").toString().trim();
-    if (status === "waiting" || status === "answered") where.status = status;
+    // ✅ status filter (최종: enum)
+    // 허용 입력:
+    // - "waiting" | "answered" | "closed" (소문자)
+    // - "WAITING" | "ANSWERED" | "CLOSED" (대문자)
+    const raw = (query?.status ?? "").toString().trim();
+    const s = raw.toUpperCase();
+
+    if (s === AskStatus.WAITING || s === AskStatus.ANSWERED || s === AskStatus.CLOSED) {
+      where.status = s as AskStatus;
+    }
 
     // q search
     const q = (query?.q ?? "").toString().trim();
@@ -71,7 +79,7 @@ export class AsksService {
     const data = rows.map((a) => ({
       id: a.id,
       title: a.title,
-      status: a.status,
+      status: a.status, // enum 값 그대로 (WAITING/ANSWERED/CLOSED)
       createdAt: a.createdAt,
       authorId: a.userId,
       authorName: emailToName(a.user.email),
@@ -153,7 +161,8 @@ export class AsksService {
         userId: uid,
         title: dto.title,
         body: dto.body,
-        status: "waiting",
+        // ✅ enum 사용
+        status: AskStatus.WAITING,
         deletedAt: null,
       },
       select: { id: true },
@@ -197,7 +206,8 @@ export class AsksService {
 
       await tx.ask.update({
         where: { id: askId },
-        data: { status: "answered" },
+        // ✅ enum 사용
+        data: { status: AskStatus.ANSWERED },
       });
     });
 

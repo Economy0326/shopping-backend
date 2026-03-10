@@ -17,6 +17,8 @@ function addHours(d: Date, h: number) {
   return new Date(d.getTime() + h * 3600_000);
 }
 
+type OptionValues = { size?: string; color?: string };
+
 @Injectable()
 export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -34,7 +36,7 @@ export class OrdersService {
   }
 
   /**
-   * ✅ 최종 확정: optionValues 기반 variantId 결정
+   * 최종 확정: optionValues 기반 variantId 결정
    *
    * 매칭 절차
    * 1) productId로 해당 상품의 옵션(option) 조회 (groupKey=size/color)
@@ -44,15 +46,20 @@ export class OrdersService {
    */
   private async resolveVariantId(
     tx: PrismaService,
-    params: { productId: number; optionValues: { size?: string; color?: string } }
+    params: { productId: number; optionValues: OptionValues }
   ) {
     const { productId } = params;
 
-    const sizeValue = params.optionValues?.size != null ? String(params.optionValues.size).trim() : "";
-    const colorValue = params.optionValues?.color != null ? String(params.optionValues.color).trim() : "";
+    const sizeValue =
+      params.optionValues?.size != null ? String(params.optionValues.size).trim() : "";
+    const colorValue =
+      params.optionValues?.color != null ? String(params.optionValues.color).trim() : "";
 
     // value가 들어왔는데 공백이면 invalid
-    if ((params.optionValues?.size && !sizeValue) || (params.optionValues?.color && !colorValue)) {
+    if (
+      (params.optionValues?.size && !sizeValue) ||
+      (params.optionValues?.color && !colorValue)
+    ) {
       throw new HttpException(
         {
           code: "VALIDATION_ERROR",
@@ -181,9 +188,16 @@ export class OrdersService {
       // items 정규화 (variantId 확정)
       const normalizedItems: Array<{ productId: number; qty: number; variantId: number }> = [];
       for (const it of dto.items) {
+        // ✅ optionValues undefined 방지 + 레거시 options 흡수(원치 않으면 options 부분 제거)
+        const ovRaw = (it as any).optionValues ?? (it as any).options ?? {};
+        const optionValues: OptionValues = {
+          size: ovRaw?.size,
+          color: ovRaw?.color,
+        };
+
         const variantId = await this.resolveVariantId(tx as any, {
           productId: it.productId,
-          optionValues: it.optionValues,
+          optionValues,
         });
 
         normalizedItems.push({
@@ -261,7 +275,7 @@ export class OrdersService {
         const lineTotal = unitPrice * it.qty;
         grandTotal += lineTotal;
 
-        // 사용자에게 보여줄 옵션 요약(문서/상세에서 쓰는 snapshot)
+        // 사용자에게 보여줄 옵션 요약(snapshot)
         const size = v.sizeOption?.value;
         const color = v.colorOption?.value;
         const optionSummary = [color, size].filter(Boolean).join(" / ") || null;
@@ -296,6 +310,7 @@ export class OrdersService {
           address2: dto.receiver.address.address2,
           memo: dto.receiver.memo ?? null,
 
+          // ✅ dto에서 PaymentMethod enum으로 받으므로 그대로 넣으면 타입 OK
           paymentMethod: dto.payment.method,
           depositor: dto.payment.depositor ?? null,
 
@@ -305,7 +320,6 @@ export class OrdersService {
         select: { id: true },
       });
 
-      // ResponseTransformInterceptor가 최종적으로 { data: ... }로 감쌈
       return { id: order.id };
     });
   }
@@ -401,7 +415,7 @@ export class OrdersService {
       items: order.items.map((it) => ({
         id: it.id,
         productId: it.productId,
-        variantId: it.variantId, // 내부 ID지만 주문 상세에서는 운영상 OK (명세가 원하면 제거 가능)
+        variantId: it.variantId,
         name: it.name,
         qty: it.qty,
         unitPrice: it.price,

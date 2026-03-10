@@ -27,7 +27,7 @@ async function main() {
     });
   }
 
-  // 1) 시스템 정책 (key: returns/bankAccount/shipping)
+  // 1) 시스템 정책 (key: returns/bankAccount/shipping/faq)
   await prisma.systemPolicy.upsert({
     where: { key: "returns" },
     update: {},
@@ -111,7 +111,7 @@ async function main() {
             : "상품 설명을 준비 중입니다.",
         sizeGuideText: p.categorySlug === "look" ? null : "사이즈 안내 텍스트 (임시)",
         productInfoText: p.categorySlug === "look" ? null : "상품 정보 텍스트 (임시)",
-        lookMdUrl: p.categorySlug === "look" ? null : null,
+        lookMdUrl: null,
         isActive: true,
         images: {
           create: [
@@ -123,7 +123,7 @@ async function main() {
       select: { id: true, categorySlug: true },
     });
 
-    // 옵션 없는 상품은 variant를 1개만(재고만 관리)
+    // 옵션 없는 상품은 variant 1개만(재고만 관리)
     if (!p.hasOptions) {
       await prisma.productVariant.create({
         data: {
@@ -136,14 +136,13 @@ async function main() {
       continue;
     }
 
-    // 옵션 있는 상품: size(M/L), color(black/white) 만들어서 조합 variant 생성
+    // 옵션 있는 상품: size(M/L), color(black/white) -> 조합 variant 생성
     const sizeLabel = "SIZE";
     const colorLabel = "COLOR";
 
     const sizeValues = ["M", "L"];
     const colorValues = ["black", "white"];
 
-    // 타입이 never로 안 깨지게 명시적으로 배열 타입을 줌
     const sizeOptions: { id: number; value: string }[] = [];
     for (const v of sizeValues) {
       const opt = await prisma.productOption.create({
@@ -174,7 +173,7 @@ async function main() {
       colorOptions.push(opt);
     }
 
-    // 조합 variant (M/L x black/white = 4개)
+    // 조합 variant (M/L x black/white)
     for (const s of sizeOptions) {
       for (const c of colorOptions) {
         await prisma.productVariant.create({

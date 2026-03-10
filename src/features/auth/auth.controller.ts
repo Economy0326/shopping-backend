@@ -30,9 +30,8 @@ export class AuthController {
 
   @UseGuards(JwtAccessGuard)
   @Get("me")
-  async me(@Req() req: any) {
-    console.log("REQ.USER =", req.user);
-    return req.user;
+  async me(@User() user: CurrentUser) {
+    return this.auth.me(user);
   }
 
   // 로그아웃은 access 없이도 가능하지만, access 있으면 hash 제거까지 수행

@@ -13,7 +13,7 @@ import { ChangePasswordDto } from "./dto/change-password.dto";
 type AccessPayload = { sub: number; email: string; role: "user" | "admin" };
 type RefreshPayload = { sub: number; tokenId: string };
 
-// ✅ "15m", "14d" 같은 env 값을 seconds(number)로 변환 (TS 오버로드 문제 해결)
+// ✅ "15m", "14d" 같은 env 값을 seconds(number)로 변환
 function parseExpiresToSeconds(input: string | undefined, fallbackSec: number) {
   if (!input) return fallbackSec;
   const m = input.trim().match(/^(\d+)\s*([smhd])$/i);
@@ -26,6 +26,10 @@ function parseExpiresToSeconds(input: string | undefined, fallbackSec: number) {
   return n * mul;
 }
 
+function addSeconds(d: Date, sec: number) {
+  return new Date(d.getTime() + sec * 1000);
+}
+
 @Injectable()
 export class AuthService {
   constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
@@ -36,7 +40,7 @@ export class AuthService {
 
     return this.jwt.signAsync(payload, {
       secret: process.env.JWT_ACCESS_SECRET!,
-      expiresIn: expiresInSec, // ✅ number로 넣어서 ts2769 해결
+      expiresIn: expiresInSec,
     });
   }
 
@@ -49,7 +53,36 @@ export class AuthService {
 
     return this.jwt.signAsync(payload, {
       secret: process.env.JWT_REFRESH_SECRET!,
-      expiresIn: expiresInSec, // ✅ number로
+      expiresIn: expiresInSec,
+    });
+  }
+
+  /**
+   * ✅ RefreshSession 기반 세션 발급 (유저당 1세션 전략)
+   * - 기존 active 세션은 revoke
+   * - 새 refreshToken은 cookie에만 저장
+   * - DB에는 hash만 저장
+   */
+  private async issueRefreshSession(userId: number, refreshToken: string) {
+    const expiresInSec = parseExpiresToSeconds(process.env.REFRESH_EXPIRES_IN, 14 * 86400);
+    const tokenHash = await bcrypt.hash(refreshToken, 10);
+    const expiresAt = addSeconds(new Date(), expiresInSec);
+
+    // 기존 active 세션 revoke (유저당 1개 유지)
+    await this.prisma.refreshSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
+    await this.prisma.refreshSession.create({
+      data: { userId, tokenHash, expiresAt },
+    });
+  }
+
+  private async revokeAllRefreshSessions(userId: number) {
+    await this.prisma.refreshSession.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
     });
   }
 
@@ -66,17 +99,12 @@ export class AuthService {
     });
 
     const accessToken = await this.signAccess({ id: user.id, email: user.email, role: user.role });
+
     const refreshToken = await this.signRefresh(user.id);
-    const refreshHash = await bcrypt.hash(refreshToken, 10);
-
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshTokenHash: refreshHash },
-    });
-
+    await this.issueRefreshSession(user.id, refreshToken);
     setRefreshCookie(res, refreshToken);
 
-    // ✅ 명세: { accessToken, user:{id, role} }
+    // ✅ (인터셉터가 {data:...}로 감싸므로) 내부 payload는 그대로
     return { accessToken, user: { id: user.id, role: user.role } };
   }
 
@@ -96,14 +124,9 @@ export class AuthService {
     }
 
     const accessToken = await this.signAccess({ id: user.id, email: user.email, role: user.role });
+
     const refreshToken = await this.signRefresh(user.id);
-
-    const refreshHash = await bcrypt.hash(refreshToken, 10);
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { refreshTokenHash: refreshHash },
-    });
-
+    await this.issueRefreshSession(user.id, refreshToken);
     setRefreshCookie(res, refreshToken);
 
     return { accessToken, user: { id: user.id, role: user.role } };
@@ -116,16 +139,11 @@ export class AuthService {
   async refresh(payload: { sub: number; email: string; role: "user" | "admin" }, res: Response) {
     const accessToken = await this.signAccess({ id: payload.sub, email: payload.email, role: payload.role });
 
-    // refresh 회전(명세: body는 accessToken만)
+    // ✅ refresh 회전: 새 refresh 발급 + 기존 세션 revoke + 새 세션 create
     const newRefresh = await this.signRefresh(payload.sub);
-    const refreshHash = await bcrypt.hash(newRefresh, 10);
-
-    await this.prisma.user.update({
-      where: { id: payload.sub },
-      data: { refreshTokenHash: refreshHash },
-    });
-
+    await this.issueRefreshSession(payload.sub, newRefresh);
     setRefreshCookie(res, newRefresh);
+
     return { accessToken };
   }
 
@@ -133,27 +151,34 @@ export class AuthService {
     clearRefreshCookie(res);
 
     if (userId) {
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { refreshTokenHash: null },
-      });
+      await this.revokeAllRefreshSessions(userId);
     }
 
-    return true; // ✅ { data: true }
+    return true;
   }
 
   // -------------------------
   // Password management
   // -------------------------
   async changePassword(userId: number, dto: ChangePasswordDto) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, password: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, password: true },
+    });
     if (!user) throw new HttpException({ ...ERR.NOT_FOUND, details: {} }, HttpStatus.NOT_FOUND);
 
     const ok = await bcrypt.compare(dto.currentPassword, user.password);
     if (!ok) throw new HttpException({ ...ERR.AUTH_INVALID_CREDENTIALS, details: {} }, HttpStatus.UNAUTHORIZED);
 
     const newHash = await bcrypt.hash(dto.newPassword, 10);
-    await this.prisma.user.update({ where: { id: userId }, data: { password: newHash, refreshTokenHash: null } });
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: newHash },
+    });
+
+    // ✅ 비번 변경 시 모든 refresh 세션 폐기
+    await this.revokeAllRefreshSessions(userId);
 
     return true;
   }
@@ -164,10 +189,11 @@ export class AuthService {
     if (!user) return true;
 
     const expiresInSec = parseExpiresToSeconds(process.env.PW_RESET_EXPIRES_IN, 60 * 60); // default 1h
-    const token = await this.jwt.signAsync({ sub: user.id, type: "pw-reset" }, { secret: process.env.JWT_PASSWORD_RESET_SECRET!, expiresIn: expiresInSec });
+    const token = await this.jwt.signAsync(
+      { sub: user.id, type: "pw-reset" },
+      { secret: process.env.JWT_PASSWORD_RESET_SECRET!, expiresIn: expiresInSec }
+    );
 
-    // In production send email; for now log to console (or integrate mailer)
-    // Example: sendEmail(user.email, `Reset token: ${token}`)
     console.log("[password-reset] token for:", user.email, token);
 
     return true;
@@ -185,10 +211,11 @@ export class AuthService {
       if (!user) throw new Error("user not found");
 
       const newHash = await bcrypt.hash(newPassword, 10);
-      await this.prisma.user.update({ where: { id: userId }, data: { password: newHash, refreshTokenHash: null } });
+      await this.prisma.user.update({ where: { id: userId }, data: { password: newHash } });
 
-      // Clear refresh cookie if present
+      // ✅ reset 성공 시 refresh cookie clear + 모든 세션 revoke
       clearRefreshCookie(res);
+      await this.revokeAllRefreshSessions(userId);
 
       return true;
     } catch (e) {
