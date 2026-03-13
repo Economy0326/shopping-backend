@@ -7,7 +7,7 @@ import { parsePageSize } from "../../shared/pagination";
 export class AdminProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** ✅ 관리자 상품 목록 */
+  /** 관리자 상품 목록 */
   async list(query: any) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
 
@@ -53,7 +53,7 @@ export class AdminProductsService {
   }
 
   /**
-   * ✅ 관리자 상품 상세(편집용)
+   * 관리자 상품 상세(편집용)
    * - 프론트 기준: optionId/variantId 노출 ❌
    * - optionGroups는 value 기반으로만 내려줌
    * - stock은 variants에서 “해당 option이 포함된 variant들의 stock 중 max”로 추정
@@ -74,16 +74,19 @@ export class AdminProductsService {
     // - sizeOptionId / colorOptionId가 일치하는 variant들의 stock 중 최대값
     const stockByOptionId = new Map<number, number>();
     for (const v of product.variants) {
+      const stock = Number(v.stock) || 0;
+
       if (v.sizeOptionId != null) {
         stockByOptionId.set(
           v.sizeOptionId,
-          Math.max(stockByOptionId.get(v.sizeOptionId) ?? 0, v.stock)
+          (stockByOptionId.get(v.sizeOptionId) ?? 0) + stock
         );
       }
+
       if (v.colorOptionId != null) {
         stockByOptionId.set(
           v.colorOptionId,
-          Math.max(stockByOptionId.get(v.colorOptionId) ?? 0, v.stock)
+          (stockByOptionId.get(v.colorOptionId) ?? 0) + stock
         );
       }
     }
@@ -117,15 +120,14 @@ export class AdminProductsService {
         productInfoMdUrl: product.productInfoMdUrl,
         lookMdUrl: product.lookMdUrl,
         isActive: product.isActive,
-        // ✅ 프론트는 url string[]로 받는다고 했으니 유지
         images: product.images.map((i) => i.url),
-        optionGroups, // ✅ value(string) 기준
+        optionGroups, 
       },
     };
   }
 
   /**
-   * ✅ 상품 생성/수정 통합(upsert)
+   * 상품 생성/수정 통합(upsert)
    * - images: url string[] (sortOrder는 배열 인덱스)
    * - optionGroups: value 기반으로 options/variants "전량 재생성"
    * - optionId/variantId는 백엔드 내부 책임(프론트 노출 ❌)
@@ -134,7 +136,7 @@ export class AdminProductsService {
     const isLook = dto.categorySlug === "look"; // look 상품이면 옵션/variant 없어도 OK
 
     return this.prisma.$transaction(async (tx) => {
-      // ✅ 기본 필드 저장
+      // 기본 필드 저장
       const baseData: any = {
         categorySlug: dto.categorySlug,
         name: dto.name,
@@ -159,7 +161,7 @@ export class AdminProductsService {
               select: { id: true },
             });
 
-      // ✅ images replace (url[] 기반)
+      // images replace (url[] 기반)
       if (dto.images) {
         await tx.productImage.deleteMany({ where: { productId: product.id } });
         if (dto.images.length) {
@@ -173,7 +175,7 @@ export class AdminProductsService {
         }
       }
 
-      // ✅ 옵션/바리언트 전량 재생성 (value 기준)
+      //  옵션/바리언트 전량 재생성 (value 기준)
       if (dto.optionGroups) {
         await tx.productVariant.deleteMany({ where: { productId: product.id } });
         await tx.productOption.deleteMany({ where: { productId: product.id } });
@@ -195,7 +197,7 @@ export class AdminProductsService {
           }))
           .filter((g) => g.options.length > 0);
 
-        // ✅ 옵션이 아예 없으면: (look이 아니면) 기본 variant 1개 생성(재고 0)
+        // 옵션이 아예 없으면: (look이 아니면) 기본 variant 1개 생성(재고 0)
         if (!groups.length) {
           if (!isLook) {
             await tx.productVariant.create({
@@ -210,7 +212,7 @@ export class AdminProductsService {
           return { data: { id: product.id } };
         }
 
-        // ✅ ProductOption 생성 (value 저장)
+        // ProductOption 생성 (value 저장)
         const createdOptions: Array<{
           id: number;
           groupKey: "size" | "color";
@@ -242,7 +244,7 @@ export class AdminProductsService {
         const sizes = createdOptions.filter((o) => o.groupKey === "size");
         const colors = createdOptions.filter((o) => o.groupKey === "color");
 
-        // ✅ variant 생성 규칙(2그룹 기준)
+        // variant 생성 규칙(2그룹 기준)
         // - size+color 둘 다 있으면: 조합 생성, stock=min(sizeStock,colorStock)
         // - 하나만 있으면: 그 옵션만 가진 variant 생성(stock=optionStock)
         if (sizes.length && colors.length) {
@@ -293,7 +295,7 @@ export class AdminProductsService {
     });
   }
 
-  /** ✅ soft delete */
+  /** soft delete */
   async remove(id: number) {
     await this.prisma.product.update({
       where: { id },

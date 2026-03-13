@@ -1,5 +1,4 @@
-import { PrismaClient, UserRole } from "@prisma/client";
-import * as bcrypt from "bcryptjs";
+import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -9,7 +8,7 @@ function img(seed: string, i: number) {
 }
 
 async function main() {
-  // 0) 카테고리 (slug는 프론트/명세 기준)
+  // 카테고리 (slug는 프론트/명세 기준)
   const categories = [
     { slug: "outer", name: "OUTER" },
     { slug: "top", name: "TOP" },
@@ -27,7 +26,7 @@ async function main() {
     });
   }
 
-  // 1) 시스템 정책 (key: returns/bankAccount/shipping/faq)
+  // 시스템 정책 (key: returns/bankAccount/shipping/faq)
   await prisma.systemPolicy.upsert({
     where: { key: "returns" },
     update: {},
@@ -67,18 +66,7 @@ async function main() {
     },
   });
 
-  // 2) 관리자 계정 생성
-  const adminEmail = "admin@example.com";
-  const adminPw = "admin1234"; // 개발용. 배포 전 반드시 변경.
-  const adminHash = await bcrypt.hash(adminPw, 10);
-
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: { role: UserRole.admin },
-    create: { email: adminEmail, password: adminHash, role: UserRole.admin },
-  });
-
-  // 3) 더미 상품 10개 (옵션/variant 포함 + look 몇개)
+  // 더미 상품 10개 (옵션/variant 포함 + look 몇개)
   const productsSeed = [
     { categorySlug: "outer", name: "워밍업 코트", price: 71000, hasOptions: true },
     { categorySlug: "outer", name: "바람막이 재킷", price: 59000, hasOptions: true },
