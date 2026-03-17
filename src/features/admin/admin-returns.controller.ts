@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards, HttpException } from "@nestjs/common";
 import { JwtAccessGuard } from "../auth/guards/jwt-access.guard";
 import { AdminGuard } from "../../shared/guards/admin.guard";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -19,29 +19,100 @@ export class AdminReturnsController {
         orderBy: { createdAt: "desc" },
         skip,
         take,
-        select: { id: true, orderId: true, status: true, reason: true, memo: true, createdAt: true },
+        select: {
+          id: true,
+          orderId: true,
+          status: true,
+          reason: true,
+          memo: true,
+          createdAt: true,
+        },
       }),
     ]);
+
     return { data: rows, meta: { page, size, total } };
   }
 
   @Post(":id/approve")
   @HttpCode(200)
   async approve(@Param("id") id: string, @Body() body: { memo?: string }) {
-    await this.prisma.return.update({
+    const ret = await this.prisma.return.findUnique({
       where: { id: Number(id) },
-      data: { status: ReturnStatus.APPROVED, memo: body.memo ?? null },
+      select: { id: true, status: true },
     });
+
+    if (!ret) {
+      throw new HttpException(
+        {
+          code: "RETURN_NOT_FOUND",
+          message: "반품 정보를 찾을 수 없습니다",
+          details: { id },
+        },
+        404,
+      );
+    }
+
+    if (ret.status !== ReturnStatus.REQUESTED) {
+      throw new HttpException(
+        {
+          code: "INVALID_RETURN_STATUS",
+          message: "REQUESTED 상태에서만 승인할 수 있습니다",
+          details: { status: ret.status },
+        },
+        400,
+      );
+    }
+
+    await this.prisma.return.update({
+      where: { id: ret.id },
+      data: {
+        status: ReturnStatus.APPROVED,
+        memo: body?.memo ?? null,
+      },
+    });
+
     return true;
   }
 
   @Post(":id/reject")
   @HttpCode(200)
-  async reject(@Param("id") id: string, @Body() body: { reason?: string }) {
-    await this.prisma.return.update({
+  async reject(@Param("id") id: string, @Body() body: { reason?: string; memo?: string }) {
+    const ret = await this.prisma.return.findUnique({
       where: { id: Number(id) },
-      data: { status: ReturnStatus.REJECTED, reason: body.reason ?? "반품 불가", memo: null },
+      select: { id: true, status: true },
     });
+
+    if (!ret) {
+      throw new HttpException(
+        {
+          code: "RETURN_NOT_FOUND",
+          message: "반품 정보를 찾을 수 없습니다",
+          details: { id },
+        },
+        404,
+      );
+    }
+
+    if (ret.status !== ReturnStatus.REQUESTED) {
+      throw new HttpException(
+        {
+          code: "INVALID_RETURN_STATUS",
+          message: "REQUESTED 상태에서만 거절할 수 있습니다",
+          details: { status: ret.status },
+        },
+        400,
+      );
+    }
+
+    await this.prisma.return.update({
+      where: { id: ret.id },
+      data: {
+        status: ReturnStatus.REJECTED,
+        reason: body?.reason?.trim() || "반품 불가",
+        memo: body?.memo?.trim() || null,
+      },
+    });
+
     return true;
   }
 }

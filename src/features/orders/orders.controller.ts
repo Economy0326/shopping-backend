@@ -41,7 +41,11 @@ export class OrdersController {
 
   @Post(":id/return-request")
   @HttpCode(200)
-  async returnReq(@User() user: CurrentUser, @Param("id") id: string, @Body() dto: ReturnRequestDto) {
-    return this.orders.returnRequest(user, id, dto.reason);
+  async returnReq(
+    @User() user: CurrentUser,
+    @Param("id") id: string,
+    @Body() dto: ReturnRequestDto,
+  ) {
+    return this.orders.returnRequest(user, id, dto.reason, dto.memo);
   }
 }

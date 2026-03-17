@@ -20,7 +20,33 @@ type PrismaOrderListRow = {
   shippedAt: Date | null;
   deliveredAt: Date | null;
 
-  user: { id: string; email: string; displayName: string | null; phone: string | null };
+  user: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    phone: string | null;
+  };
+
+  // 대표 상품용
+  items: Array<{
+    name: string;
+    thumbnailUrl: string | null;
+    optionSummary: string | null;
+  }>;
+
+  // 총 아이템 개수용
+  _count: {
+    items: number;
+  };
+
+  // 반품 상태 표시용
+  return: null | {
+    id: string;
+    status: ReturnStatus;
+    reason: string | null;
+    memo: string | null;
+    createdAt: Date;
+  };
 };
 
 type PrismaOrderDetailRow = {
@@ -49,7 +75,12 @@ type PrismaOrderDetailRow = {
 
   grandTotal: number;
 
-  user: { id: string; email: string; displayName: string | null; phone: string | null };
+  user: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    phone: string | null;
+  };
 
   items: Array<{
     id: string;
@@ -91,20 +122,21 @@ export class OrderMapper {
       buyer: {
         id: o.user.id,
         email: o.user.email,
-        name: buyerName, // (프론트가 buyer.name 쓰는 상태면 유지)
+        name: buyerName,
         phone: o.user.phone ?? null,
       },
 
-      // receiver로 통일 (list shape)
       receiver: {
         name: o.receiverName,
         phone: o.receiverPhone,
         email: o.receiverEmail ?? null,
       },
 
-      payment: { method: o.paymentMethod, depositor: o.depositor ?? null },
+      payment: {
+        method: o.paymentMethod,
+        depositor: o.depositor ?? null,
+      },
 
-      // 응답 shipping shape
       shipping: {
         carrier: o.carrier ?? null,
         trackingNo: o.trackingNo ?? null,
@@ -118,12 +150,33 @@ export class OrderMapper {
         discountTotal: 0,
         grandTotal: o.grandTotal,
       },
+
+      representativeItem: {
+        name: o.items?.[0]?.name ?? null,
+        thumbnailUrl: o.items?.[0]?.thumbnailUrl ?? null,
+        optionSummary: o.items?.[0]?.optionSummary ?? null,
+      },
+
+      itemsCount: o._count?.items ?? 0,
+
+      return: o.return
+        ? {
+            id: o.return.id,
+            status: o.return.status,
+            reason: o.return.reason ?? null,
+            memo: o.return.memo ?? null,
+            createdAt: o.return.createdAt.toISOString(),
+          }
+        : null,
     };
   }
 
   static toAdminDetail(order: PrismaOrderDetailRow) {
     const buyerName = order.user.displayName ?? emailToName(order.user.email);
-    const itemsTotal = (order.items || []).reduce((sum, it) => sum + it.price * it.qty, 0);
+    const itemsTotal = (order.items || []).reduce(
+      (sum, it) => sum + it.price * it.qty,
+      0
+    );
 
     return {
       id: order.id,

@@ -122,30 +122,87 @@ export class AdminOrdersController {
   @Post(":id/refund-log")
   @HttpCode(200)
   async refundLog(@Param("id") id: string, @Body() body: { amount: number; memo: string }) {
-    if (typeof body?.amount !== "number" || !body?.memo) {
+    if (typeof body?.amount !== "number" || !body?.memo?.trim()) {
       throw new HttpException(
-        { code: "VALIDATION_ERROR", message: "amount/memo가 필요합니다", details: {} },
-        400
+        {
+          code: "VALIDATION_ERROR",
+          message: "amount/memo가 필요합니다",
+          details: {},
+        },
+        400,
       );
     }
 
     const order = await this.prisma.order.findUnique({
       where: { id },
-      include: { return: true },
+      include: {
+        return: true,
+        items: true,
+        refundLogs: true,
+      },
     });
-    if (!order) throw new HttpException({ ...ERR.ORDER_NOT_FOUND, details: { id } }, 404);
+
+    if (!order) {
+      throw new HttpException({ ...ERR.ORDER_NOT_FOUND, details: { id } }, 404);
+    }
+
+    if (!order.return) {
+      throw new HttpException(
+        {
+          code: "RETURN_NOT_FOUND",
+          message: "반품 정보가 없습니다",
+          details: { id },
+        },
+        404,
+      );
+    }
+
+    if (order.return.status !== ReturnStatus.APPROVED) {
+      throw new HttpException(
+        {
+          code: "INVALID_RETURN_STATUS",
+          message: "APPROVED 상태에서만 환불 처리할 수 있습니다",
+          details: { status: order.return.status },
+        },
+        400,
+      );
+    }
+
+    if (order.refundLogs?.length > 0) {
+      throw new HttpException(
+        {
+          code: "REFUND_ALREADY_PROCESSED",
+          message: "이미 환불 처리된 주문입니다",
+          details: { id },
+        },
+        409,
+      );
+    }
 
     await this.prisma.$transaction(async (tx) => {
       await tx.refundLog.create({
-        data: { orderId: id, amount: body.amount, memo: body.memo },
+        data: {
+          orderId: id,
+          amount: body.amount,
+          memo: body.memo.trim(),
+        },
       });
 
-      if (order.return?.status === ReturnStatus.APPROVED) {
-        await tx.return.update({
-          where: { id: order.return.id },
-          data: { status: ReturnStatus.REFUNDED },
-        });
+      for (const it of order.items) {
+        if (it.variantId) {
+          await tx.productVariant.update({
+            where: { id: it.variantId },
+            data: {
+              stock: { increment: it.qty },
+            },
+          });
+        }
       }
+
+      await tx.return.update({
+        where: { id: order.return!.id },
+        data: { status: ReturnStatus.REFUNDED },
+      });
     });
 
     return true;

@@ -27,13 +27,13 @@ export class AdminProductsController {
     return this.service.list(query);
   }
 
-  /** ✅ 관리자 상품 상세(편집용) - optionGroups를 value 기반으로 내려줌 */
+  /**  관리자 상품 상세(편집용) - optionGroups를 value 기반으로 내려줌 */
   @Get(":id")
   detail(@Param("id") id: string) {
     return this.service.detail(Number(id));
   }
 
-  /** ✅ 생성/수정/패치 모두 upsert로 통일 */
+  /**  생성/수정/패치 모두 upsert로 통일 */
   @Post()
   @HttpCode(200)
   create(@Body() dto: AdminUpsertProductDto) {
@@ -52,7 +52,7 @@ export class AdminProductsController {
     return this.service.upsert(Number(id), dto);
   }
 
-  /** ✅ 운영은 soft delete 권장(isActive=false) */
+  /**  운영은 soft delete 권장(isActive=false) */
   @Delete(":id")
   @HttpCode(200)
   remove(@Param("id") id: string) {

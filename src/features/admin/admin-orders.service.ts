@@ -10,16 +10,13 @@ export class AdminOrdersService {
   async list(query: any) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
 
-    // 필터/검색 where 구성
     const where: any = {};
 
-    // status filter (프론트는 "AWAITING_DEPOSIT" 같은 enum을 보냄)
     const status = String(query?.status ?? "").trim();
     if (status) {
       where.status = status;
     }
 
-    // q search: 주문ID / 이메일 / 이름(디스플레이네임) / 입금자 / 수령인 정보 등
     const q = String(query?.q ?? "").trim();
     if (q) {
       where.OR = [
@@ -68,6 +65,35 @@ export class AdminOrdersService {
 
           user: {
             select: { id: true, email: true, displayName: true, phone: true },
+          },
+
+          // 추가: 대표상품용
+          items: {
+            take: 1,
+            orderBy: { id: "asc" },
+            select: {
+              name: true,
+              thumbnailUrl: true,
+              optionSummary: true,
+            },
+          },
+
+          // 추가: 총 상품 수
+          _count: {
+            select: {
+              items: true,
+            },
+          },
+
+          // 추가: 반품 상태
+          return: {
+            select: {
+              id: true,
+              status: true,
+              reason: true,
+              memo: true,
+              createdAt: true,
+            },
           },
         },
       }),

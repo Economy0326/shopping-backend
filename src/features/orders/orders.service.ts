@@ -158,7 +158,7 @@ export class OrdersService {
     return found.id;
   }
 
-  // ✅ items는 optionValues 기반만 허용
+  // items는 optionValues 기반만 허용
   async create(user: CurrentUser, dto: CreateOrderDto) {
     if (!dto.items?.length) {
       throw new HttpException(
@@ -188,7 +188,7 @@ export class OrdersService {
       // items 정규화 (variantId 확정)
       const normalizedItems: Array<{ productId: number; qty: number; variantId: number }> = [];
       for (const it of dto.items) {
-        // ✅ optionValues undefined 방지 + 레거시 options 흡수(원치 않으면 options 부분 제거)
+        //  optionValues undefined 방지 + 레거시 options 흡수(원치 않으면 options 부분 제거)
         const ovRaw = (it as any).optionValues ?? (it as any).options ?? {};
         const optionValues: OptionValues = {
           size: ovRaw?.size,
@@ -310,7 +310,7 @@ export class OrdersService {
           address2: dto.receiver.address.address2,
           memo: dto.receiver.memo ?? null,
 
-          // ✅ dto에서 PaymentMethod enum으로 받으므로 그대로 넣으면 타입 OK
+          //  dto에서 PaymentMethod enum으로 받으므로 그대로 넣으면 타입 OK
           paymentMethod: dto.payment.method,
           depositor: dto.payment.depositor ?? null,
 
@@ -342,7 +342,32 @@ export class OrdersService {
           createdAt: true,
           expiresAt: true,
           grandTotal: true,
-          items: { take: 1, select: { name: true, thumbnailUrl: true } },
+
+          // 대표 상품 정보 (첫 번째 아이템)
+          items: {
+            take: 1,
+            select: {
+              name: true,
+              thumbnailUrl: true,
+              optionSummary: true,
+            },
+          },
+
+          // 아이템 개수용
+          _count: {
+            select: { items: true },
+          },
+
+          // 반품 상태 표시용
+          return: {
+            select: {
+              id: true,
+              status: true,
+              reason: true,
+              memo: true,
+              createdAt: true,
+            },
+          },
         },
       }),
     ]);
@@ -351,17 +376,32 @@ export class OrdersService {
       id: o.id,
       status: o.status,
       createdAt: o.createdAt.toISOString(),
-      expiresAt: o.expiresAt.toISOString(),
+      expiresAt: o.expiresAt ? o.expiresAt.toISOString() : null,
+
       amounts: {
         itemsTotal: o.grandTotal,
         shippingFee: 0,
         discountTotal: 0,
         grandTotal: o.grandTotal,
       },
-      preview: {
+
+      representativeItem: {
         name: o.items?.[0]?.name ?? null,
         thumbnailUrl: o.items?.[0]?.thumbnailUrl ?? null,
+        optionSummary: o.items?.[0]?.optionSummary ?? null,
       },
+
+      itemsCount: o._count?.items ?? 0,
+
+      return: o.return
+        ? {
+            id: o.return.id,
+            status: o.return.status,
+            reason: o.return.reason ?? null,
+            memo: o.return.memo ?? null,
+            createdAt: o.return.createdAt.toISOString(),
+          }
+        : null,
     }));
 
     return { data, meta: { page, size, total } };
@@ -498,7 +538,7 @@ export class OrdersService {
     return true;
   }
 
-  async returnRequest(user: CurrentUser, id: string, reason?: string) {
+  async returnRequest(user: CurrentUser, id: string, reason?: string, memo?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: { return: true },
@@ -519,7 +559,12 @@ export class OrdersService {
     }
 
     const ret = await this.prisma.return.create({
-      data: { orderId: id, status: ReturnStatus.REQUESTED, reason: reason ?? null },
+      data: {
+        orderId: id,
+        status: ReturnStatus.REQUESTED,
+        reason: reason ?? null,
+        memo: memo ?? null,
+      },
       select: { id: true, status: true },
     });
 
