@@ -1,98 +1,210 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Backend API / 운영 기준 문서
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+## 인증 & 보안 정책
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+### JWT 인증 구조
 
-## Description
+#### Access Token
+- 프론트 메모리(tokenMemory)에만 저장
+- localStorage / sessionStorage 저장 금지
+- 모든 인증 요청에 자동 포함  
+  Authorization: Bearer <accessToken>
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+#### Refresh Token
+- 서버 발급
+- HttpOnly + Secure Cookie
+- 프론트 JS 접근 불가
+- DB에는 hash만 저장 (RefreshSession)
 
-## Project setup
+---
 
-```bash
-$ npm install
-```
+## 토큰 갱신 정책
 
-## Compile and run the project
+- 일반 API 요청 중 401 발생 시 /auth/refresh 자동 재시도 금지
+- 앱 최초 진입 시(accessToken 없음)에만 /auth/refresh 1회 허용
+- refresh 요청 시 헤더  
+  x-silent-auth: true
+- refresh 실패 시 비로그인 상태 유지 + 로그인 모달 표시
 
-```bash
-# development
-$ npm run start
+---
 
-# watch mode
-$ npm run start:dev
+## 401 처리 UX 연동 정책
 
-# production mode
-$ npm run start:prod
-```
+1. accessToken 제거  
+2. AUTH_REQUIRED 이벤트 발생  
+3. 강제 라우팅 금지  
+4. 현재 화면 유지 + 로그인 모달  
 
-## Run tests
+---
 
-```bash
-# unit tests
-$ npm run test
+## CORS 정책
 
-# e2e tests
-$ npm run test:e2e
+- 프론트: withCredentials: true
+- 서버:
+  - Access-Control-Allow-Credentials: true
+  - Access-Control-Allow-Origin: 정확한 Origin만 허용
+  - * 금지
 
-# test coverage
-$ npm run test:cov
-```
+---
 
-## Deployment
+## 공통 응답 포맷
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### 성공 응답 (단건)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+{  
+  "data": {}  
+}
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+### 리스트 응답
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+{  
+  "data": [],  
+  "meta": { "page": 1, "size": 20, "total": 123 }  
+}
 
-## Resources
+### 에러 응답
 
-Check out a few resources that may come in handy when working with NestJS:
+{  
+  "error": {  
+    "code": "INVALID_OPTION_COMBINATION",  
+    "message": "선택한 옵션 조합이 존재하지 않습니다",  
+    "details": {}  
+  }  
+}
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+---
 
-## Support
+## 응답 변환 규칙
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- 모든 성공 응답은 { data: ... }
+- { id: ... } → { data: { id: ... } }로 변환
+- 이미 { data }면 그대로 유지
 
-## Stay in touch
+---
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## 주문(Orders) 운영 정책
 
-## License
+### 주문 상태
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+AWAITING_DEPOSIT  
+DEPOSIT_CONFIRMED  
+SHIPPED  
+DELIVERED  
+CANCELED  
+
+---
+
+### 결제 수단
+
+BANK_TRANSFER
+
+---
+
+## 주문 생성 정책
+
+- optionValues(groupKey, value) 기반으로 variant 탐색
+
+### 처리 순서
+
+1. productId 조회  
+2. optionValues → optionId 매핑  
+3. optionId 조합으로 variant 탐색  
+4. 재고 확인 후 주문 확정  
+
+---
+
+### 400 에러 조건
+
+- optionValues 누락
+- 옵션 없음
+- variant 없음
+- 재고 부족
+
+※ optionVaues 오타 → optionValues로 통일
+
+---
+
+## 무통장 + 택배 운영법
+
+1. 주문 생성 → AWAITING_DEPOSIT (12시간, 재고 차감)  
+2. 입금 확인 → DEPOSIT_CONFIRMED  
+3. 발송 등록 → SHIPPED  
+4. 구매확정 또는 7일 후 자동 → DELIVERED  
+
+---
+
+### 미입금 취소
+
+- 12시간 후 CANCELED
+- 재고 복구
+
+---
+
+## 반품 / 환불 운영법
+
+### 상태
+
+REQUESTED  
+APPROVED  
+REJECTED  
+REFUNDED  
+
+---
+
+### 처리
+
+- 반품 신청: DELIVERED 상태만 가능
+- 승인: POST /admin/returns/{id}/approve
+- 거절: POST /admin/returns/{id}/reject
+
+---
+
+### 환불
+
+- refund-log 생성
+- REFUNDED 상태 변경
+
+---
+
+## 재고 정책
+
+- 주문 시 차감
+- 미입금 취소 시 복구
+- 반품 승인 단계에서는 복구 안 함
+- REFUNDED 시 복구
+
+---
+
+## refund-log 제약
+
+- APPROVED 상태에서만 생성 가능
+- 생성 시 REFUNDED 전환
+- 중복 실행 불가
+
+---
+
+## Prisma / 배포 운영 규칙
+
+### 원칙
+
+- build 시 prisma generate
+- 배포 전 prisma migrate deploy
+- seed 자동 실행 금지
+
+---
+
+### 점검 항목
+
+- package.json 스크립트 확인
+- migrations 폴더 정합성 확인
+- schema만 수정된 상태 여부 확인
+- DB migration history 일치 여부 확인
+
+---
+
+## Render 운영 체크
+
+- Build Command: 의존성 설치 + 빌드
+- Pre-Deploy: prisma migrate deploy
+- Start Command: 서버 실행
+- seed: 수동 실행만 허용
