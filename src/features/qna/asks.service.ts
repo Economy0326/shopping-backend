@@ -26,6 +26,10 @@ export class AsksService {
     return String((user as any)?.role ?? "").toLowerCase() === "admin";
   }
 
+  private toClientStatus(status: AskStatus | string | null | undefined) {
+    return String(status ?? "").toLowerCase();
+  }
+
   async list(user: CurrentUser, query: any) {
     const { page, size, skip, take } = parsePageSize(query, 10, 100);
 
@@ -43,10 +47,6 @@ export class AsksService {
       where.userId = uid;
     }
 
-    // ✅ status filter (최종: enum)
-    // 허용 입력:
-    // - "waiting" | "answered" | "closed" (소문자)
-    // - "WAITING" | "ANSWERED" | "CLOSED" (대문자)
     const raw = (query?.status ?? "").toString().trim();
     const s = raw.toUpperCase();
 
@@ -79,7 +79,7 @@ export class AsksService {
     const data = rows.map((a) => ({
       id: a.id,
       title: a.title,
-      status: a.status, // enum 값 그대로 (WAITING/ANSWERED/CLOSED)
+      status: this.toClientStatus(a.status), // waiting, answered, closed
       createdAt: a.createdAt,
       authorId: a.userId,
       authorName: emailToName(a.user.email),
@@ -129,7 +129,7 @@ export class AsksService {
       id: row.id,
       title: row.title,
       body: row.body,
-      status: row.status,
+      status: this.toClientStatus(row.status), // waiting, answered, closed
       createdAt: row.createdAt,
       authorId: row.userId,
       authorName: emailToName(row.user.email),
@@ -161,7 +161,6 @@ export class AsksService {
         userId: uid,
         title: dto.title,
         body: dto.body,
-        // ✅ enum 사용
         status: AskStatus.WAITING,
         deletedAt: null,
       },
@@ -206,7 +205,6 @@ export class AsksService {
 
       await tx.ask.update({
         where: { id: askId },
-        // ✅ enum 사용
         data: { status: AskStatus.ANSWERED },
       });
     });
