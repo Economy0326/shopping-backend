@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, HttpException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { ERR } from "../../shared/errors";
 
@@ -14,8 +14,21 @@ export class SystemService {
     }
 
     const row = await this.prisma.systemPolicy.findUnique({ where: { key } });
-    if (!row) throw new NotFoundException({ ...ERR.NOT_FOUND, details: { key } } as any);
-    return { key: row.key, value: row.value, updatedAt: row.updatedAt };
+
+    // faq가 없는 경우 404가 아니라 빈 정책으로 반환
+    if (!row) {
+      return {
+        key,
+        value: "",
+        updatedAt: null,
+      };
+    }
+
+    return {
+      key: row.key,
+      value: row.value,
+      updatedAt: row.updatedAt,
+    };
   }
 
   async updatePolicy(key: string, value: string) {
@@ -23,13 +36,16 @@ export class SystemService {
       throw new NotFoundException({ ...ERR.NOT_FOUND, details: { key } } as any);
     }
 
-    // upsert로 없으면 생성까지 (운영 편의)
-    await this.prisma.systemPolicy.upsert({
+    const row = await this.prisma.systemPolicy.upsert({
       where: { key },
       update: { value },
       create: { key, value },
     });
 
-    return true;
+    return {
+      key: row.key,
+      value: row.value,
+      updatedAt: row.updatedAt,
+    };
   }
 }
