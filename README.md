@@ -79,6 +79,8 @@
 - 모든 성공 응답은 { data: ... }
 - { id: ... } → { data: { id: ... } }로 변환
 - 이미 { data }면 그대로 유지
+- 값이 비어 있는 상태(empty value)는 정상 응답일 수 있다
+- 이 경우에도 404 대신 200 + { data: ... } 형태로 반환한다
 
 ---
 
@@ -208,3 +210,70 @@ REFUNDED
 - Pre-Deploy: prisma migrate deploy
 - Start Command: 서버 실행
 - seed: 수동 실행만 허용
+
+---
+
+## Notice 운영 규칙
+
+### 공개 API
+
+- GET /notices
+- GET /notices/{id}
+
+### 관리자 API
+
+- GET /admin/notices
+- POST /admin/notices
+- PATCH /admin/notices/{id}
+- DELETE /admin/notices/{id}
+
+### 정책
+
+- 공지 list / detail 은 공개 조회 가능
+- 공지 생성 / 수정 / 삭제는 admin만 가능
+- 응답은 { data: ... } 형식으로 통일
+- 목록: { data: [...], meta: ... }
+- 생성: { data: { id } }
+- 수정/삭제: { data: true }
+- 존재하지 않는 공지는 404 가능
+
+---
+
+## QnA 운영 규칙
+
+- user: 본인 데이터만 조회
+- admin: 전체 조회
+- detail: 작성자 또는 admin만 접근 가능
+- 삭제: soft delete (deletedAt 기준)
+
+응답 규칙:
+
+- 목록: { data: [...], meta: ... }
+- 상세: { data: {...} }
+- 변경: { data: true }
+
+---
+
+## System Policy 운영 규칙
+
+다음 항목은 system policy로 관리한다
+
+- faq
+- returns
+- bankAccount
+- shipping
+
+### 공통 정책
+
+- 조회 시 값이 없어도 404를 반환하지 않는다
+- 값이 없으면 빈 값으로 정상 응답한다
+- 성공 응답은 { data: ... } 형식을 따른다
+
+### FAQ 정책
+
+- FAQ 조회는 공개 가능
+- FAQ 수정은 관리자만 가능
+- FAQ는 plain text 기준
+- 줄바꿈 유지
+- FAQ 빈 값은 정상 상태
+- 미등록 시에도 404가 아니라 빈 값 반환
