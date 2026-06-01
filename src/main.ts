@@ -14,22 +14,50 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
 
   const originEnv = process.env.CORS_ORIGIN ?? "http://localhost:3000";
-  const origin = originEnv.includes(",")
-    ? originEnv.split(",").map((s) => s.trim())
-    : originEnv;
+  const allowedOrigins = originEnv
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  app.enableCors({ origin, credentials: true });
+  app.enableCors({
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin) {
+        return callback(null, true);
+      }
+
+      if (allowedOrigins.includes(requestOrigin)) {
+        return callback(null, true);
+      }
+
+      console.error("[CORS] Blocked origin:", requestOrigin);
+      return callback(new Error(`Not allowed by CORS: ${requestOrigin}`), false);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-silent-auth",
+      "idempotency-key",
+    ],
+  });
 
   app.use(cookieParser());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalInterceptors(new ResponseTransformInterceptor());
 
-  // 정적 파일: public 폴더를 루트로 제공
   app.use(express.static(path.join(process.cwd(), "public")));
 
   const port = Number(process.env.PORT ?? 8080);
   await app.listen(port);
   console.log(`🚀 API running on port ${port} (prefix: /api/v1)`);
+  console.log("[CORS] allowed origins:", allowedOrigins);
 }
 bootstrap();
