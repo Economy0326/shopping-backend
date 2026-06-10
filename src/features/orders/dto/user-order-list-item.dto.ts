@@ -1,12 +1,19 @@
-import { Type } from "class-transformer";
-import { IsDateString, IsInt, IsOptional, IsString, ValidateNested } from "class-validator";
-import { OrderAmountsDto } from "../../../shared/dto/orders/order-amounts.dto";
+import { Type } from 'class-transformer';
+import {
+  IsDateString,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { OrderAmountsDto } from '../../../shared/dto/orders/order-amounts.dto';
 
 class OrderPreviewDto {
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   name!: string | null;
 
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   thumbnailUrl!: string | null;
 }
 

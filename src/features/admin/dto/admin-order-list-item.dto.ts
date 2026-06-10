@@ -1,7 +1,7 @@
-import { BuyerDto } from "./buyer.dto";
-import { OrderAmountsDto } from "../../../shared/dto/orders/order-amounts.dto";
-import { OrderShippingDto } from "../../../shared/dto/orders/order-shipping.dto";
-import { OrderReceiverListDto } from "../../../shared/dto/orders/order-receiver.dto";
+import { BuyerDto } from './buyer.dto';
+import { OrderAmountsDto } from '../../../shared/dto/orders/order-amounts.dto';
+import { OrderShippingDto } from '../../../shared/dto/orders/order-shipping.dto';
+import { OrderReceiverListDto } from '../../../shared/dto/orders/order-receiver.dto';
 
 export class AdminOrderListItemDto {
   id!: string;

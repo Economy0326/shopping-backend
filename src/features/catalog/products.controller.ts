@@ -1,7 +1,7 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
-import { ProductsService } from "./products.service";
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { ProductsService } from './products.service';
 
-@Controller("products")
+@Controller('products')
 export class ProductsController {
   constructor(private readonly products: ProductsService) {}
 
@@ -10,8 +10,8 @@ export class ProductsController {
     return this.products.list(query);
   }
 
-  @Get(":id")
-  async detail(@Param("id") id: string) {
+  @Get(':id')
+  async detail(@Param('id') id: string) {
     return this.products.detail(Number(id));
   }
 }

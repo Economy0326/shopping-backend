@@ -5,7 +5,10 @@ export type AppErrorBody = {
 };
 
 export class AppError extends Error {
-  constructor(public readonly body: AppErrorBody, public readonly status: number) {
+  constructor(
+    public readonly body: AppErrorBody,
+    public readonly status: number,
+  ) {
     super(body.message);
   }
 }

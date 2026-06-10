@@ -4,14 +4,14 @@ import {
   HttpException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
-import { ERR } from "../../shared/errors";
-import { makeId } from "../../shared/ids";
-import { parsePageSize } from "../../shared/pagination";
-import { CreateOrderDto } from "./dto/create-order.dto";
-import type { CurrentUser } from "../../shared/current-user";
-import { OrderStatus, ReturnStatus } from "@prisma/client";
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { ERR } from '../../shared/errors';
+import { makeId } from '../../shared/ids';
+import { parsePageSize } from '../../shared/pagination';
+import { CreateOrderDto } from './dto/create-order.dto';
+import type { CurrentUser } from '../../shared/current-user';
+import { OrderStatus, ReturnStatus } from '@prisma/client';
 
 function addHours(d: Date, h: number) {
   return new Date(d.getTime() + h * 3600_000);
@@ -28,32 +28,62 @@ export class OrdersService {
     return Number.isFinite(n) ? n : 0;
   }
 
-  private ensureOwnerOrAdmin(user: CurrentUser, orderUserId: number) {
-    if (String((user as any)?.role ?? "").toLowerCase() === "admin") return;
-    if (String((user as any)?.sub) !== String(orderUserId)) {
-      throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
+  private isAdmin(user: CurrentUser | null): boolean {
+    return String((user as any)?.role ?? '').toLowerCase() === 'admin';
+  }
+
+  private normalizePhone(phone?: string | null): string {
+    return String(phone ?? '').replace(/[^0-9]/g, '');
+  }
+
+  private ensureOrderAccess(
+    user: CurrentUser | null,
+    order: { userId: number | null; receiverPhone: string },
+    guestPhone?: string,
+  ) {
+    // 관리자는 모든 주문 접근 가능
+    if (this.isAdmin(user)) return;
+
+    // 회원 주문이면 로그인한 본인만 접근 가능
+    if (order.userId !== null) {
+      if (!user) {
+        throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
+      }
+
+      if (String((user as any).sub) !== String(order.userId)) {
+        throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
+      }
+
+      return;
+    }
+
+    // 비회원 주문이면 orderId + phone 검증
+    const inputPhone = this.normalizePhone(guestPhone);
+    const orderPhone = this.normalizePhone(order.receiverPhone);
+
+    if (!inputPhone || inputPhone !== orderPhone) {
+      throw new ForbiddenException({
+        ...ERR.FORBIDDEN,
+        message: '주문번호와 연락처가 일치하지 않습니다.',
+        details: {},
+      } as any);
     }
   }
 
-  /**
-   * 최종 확정: optionValues 기반 variantId 결정
-   *
-   * 매칭 절차
-   * 1) productId로 해당 상품의 옵션(option) 조회 (groupKey=size/color)
-   * 2) optionValues(size/color)의 value → optionId 매칭
-   * 3) (sizeOptionId, colorOptionId)로 variant 탐색
-   * 4) 없으면 400/404 처리
-   */
   private async resolveVariantId(
     tx: PrismaService,
-    params: { productId: number; optionValues: OptionValues }
+    params: { productId: number; optionValues: OptionValues },
   ) {
     const { productId } = params;
 
     const sizeValue =
-      params.optionValues?.size != null ? String(params.optionValues.size).trim() : "";
+      params.optionValues?.size != null
+        ? String(params.optionValues.size).trim()
+        : '';
     const colorValue =
-      params.optionValues?.color != null ? String(params.optionValues.color).trim() : "";
+      params.optionValues?.color != null
+        ? String(params.optionValues.color).trim()
+        : '';
 
     // value가 들어왔는데 공백이면 invalid
     if (
@@ -62,11 +92,11 @@ export class OrdersService {
     ) {
       throw new HttpException(
         {
-          code: "VALIDATION_ERROR",
-          message: "optionValues 값이 비어있습니다",
+          code: 'VALIDATION_ERROR',
+          message: 'optionValues 값이 비어있습니다',
           details: { productId, optionValues: params.optionValues },
         },
-        400
+        400,
       );
     }
 
@@ -85,7 +115,7 @@ export class OrdersService {
       if (!v) {
         throw new NotFoundException({
           ...ERR.VARIANT_NOT_FOUND,
-          details: { productId, reason: "no default variant" },
+          details: { productId, reason: 'no default variant' },
         } as any);
       }
       return v.id;
@@ -95,11 +125,11 @@ export class OrdersService {
     if (!sizeValue && !colorValue) {
       throw new HttpException(
         {
-          code: "VALIDATION_ERROR",
-          message: "옵션이 있는 상품은 optionValues가 필요합니다",
+          code: 'VALIDATION_ERROR',
+          message: '옵션이 있는 상품은 optionValues가 필요합니다',
           details: { productId },
         },
-        400
+        400,
       );
     }
 
@@ -107,13 +137,13 @@ export class OrdersService {
     const [sizeOpt, colorOpt] = await Promise.all([
       sizeValue
         ? tx.productOption.findFirst({
-            where: { productId, groupKey: "size", value: sizeValue },
+            where: { productId, groupKey: 'size', value: sizeValue },
             select: { id: true },
           })
         : Promise.resolve(null),
       colorValue
         ? tx.productOption.findFirst({
-            where: { productId, groupKey: "color", value: colorValue },
+            where: { productId, groupKey: 'color', value: colorValue },
             select: { id: true },
           })
         : Promise.resolve(null),
@@ -122,21 +152,21 @@ export class OrdersService {
     if (sizeValue && !sizeOpt) {
       throw new HttpException(
         {
-          code: "VALIDATION_ERROR",
-          message: "optionValues.size가 상품 옵션과 일치하지 않습니다",
+          code: 'VALIDATION_ERROR',
+          message: 'optionValues.size가 상품 옵션과 일치하지 않습니다',
           details: { productId, size: sizeValue },
         },
-        400
+        400,
       );
     }
     if (colorValue && !colorOpt) {
       throw new HttpException(
         {
-          code: "VALIDATION_ERROR",
-          message: "optionValues.color가 상품 옵션과 일치하지 않습니다",
+          code: 'VALIDATION_ERROR',
+          message: 'optionValues.color가 상품 옵션과 일치하지 않습니다',
           details: { productId, color: colorValue },
         },
-        400
+        400,
       );
     }
 
@@ -151,7 +181,12 @@ export class OrdersService {
     if (!found) {
       throw new NotFoundException({
         ...ERR.VARIANT_NOT_FOUND,
-        details: { productId, optionValues: params.optionValues, sizeId, colorId },
+        details: {
+          productId,
+          optionValues: params.optionValues,
+          sizeId,
+          colorId,
+        },
       } as any);
     }
 
@@ -159,34 +194,43 @@ export class OrdersService {
   }
 
   // items는 optionValues 기반만 허용
-  async create(user: CurrentUser, dto: CreateOrderDto) {
+  async create(user: CurrentUser | null, dto: CreateOrderDto) {
     if (!dto.items?.length) {
       throw new HttpException(
-        { code: "VALIDATION_ERROR", message: "items가 비어있습니다", details: {} },
-        400
+        {
+          code: 'VALIDATION_ERROR',
+          message: 'items가 비어있습니다',
+          details: {},
+        },
+        400,
       );
     }
 
     const now = new Date();
     const expiresAt = addHours(now, 12);
-    const orderId = makeId("O");
+    const orderId = makeId('O');
 
     return this.prisma.$transaction(async (tx) => {
       // receiver.address 정규화 (zip/zipcode 모두 허용)
-      const zip = dto.receiver.address?.zip ?? dto.receiver.address?.zipcode ?? "";
+      const zip =
+        dto.receiver.address?.zip ?? dto.receiver.address?.zipcode ?? '';
       if (!zip) {
         throw new HttpException(
           {
-            code: "VALIDATION_ERROR",
-            message: "receiver.address.zip(또는 zipcode)가 필요합니다",
+            code: 'VALIDATION_ERROR',
+            message: 'receiver.address.zip(또는 zipcode)가 필요합니다',
             details: {},
           },
-          400
+          400,
         );
       }
 
       // items 정규화 (variantId 확정)
-      const normalizedItems: Array<{ productId: number; qty: number; variantId: number }> = [];
+      const normalizedItems: Array<{
+        productId: number;
+        qty: number;
+        variantId: number;
+      }> = [];
       for (const it of dto.items) {
         //  optionValues undefined 방지 + 레거시 options 흡수(원치 않으면 options 부분 제거)
         const ovRaw = (it as any).optionValues ?? (it as any).options ?? {};
@@ -208,20 +252,29 @@ export class OrdersService {
       }
 
       // products 한번에 읽기
-      const productIds = Array.from(new Set(normalizedItems.map((i) => i.productId)));
+      const productIds = Array.from(
+        new Set(normalizedItems.map((i) => i.productId)),
+      );
       const products = await tx.product.findMany({
         where: { id: { in: productIds }, isActive: true },
         select: {
           id: true,
           name: true,
           price: true,
-          images: { orderBy: { sortOrder: "asc" }, take: 1, select: { url: true } },
+          images: {
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
+            select: { url: true },
+          },
         },
       });
 
       const pMap = new Map(products.map((p) => [p.id, p]));
       if (products.length !== productIds.length) {
-        throw new NotFoundException({ ...ERR.NOT_FOUND, details: { what: "product" } } as any);
+        throw new NotFoundException({
+          ...ERR.NOT_FOUND,
+          details: { what: 'product' },
+        } as any);
       }
 
       // variants 한번에 읽기
@@ -240,7 +293,10 @@ export class OrdersService {
 
       const vMap = new Map(variants.map((v) => [v.id, v]));
       if (variants.length !== variantIds.length) {
-        throw new NotFoundException({ ...ERR.VARIANT_NOT_FOUND, details: {} } as any);
+        throw new NotFoundException({
+          ...ERR.VARIANT_NOT_FOUND,
+          details: {},
+        } as any);
       }
 
       const orderItemsData: any[] = [];
@@ -251,13 +307,17 @@ export class OrdersService {
         const p = pMap.get(it.productId);
         const v = vMap.get(it.variantId);
 
-        if (!p || !v) throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} } as any);
+        if (!p || !v)
+          throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} } as any);
 
         // variant는 반드시 해당 product 소속
         if (v.productId !== it.productId) {
           throw new HttpException(
-            { ...ERR.INVALID_VARIANT, details: { productId: it.productId, variantId: it.variantId } },
-            400
+            {
+              ...ERR.INVALID_VARIANT,
+              details: { productId: it.productId, variantId: it.variantId },
+            },
+            400,
           );
         }
 
@@ -268,7 +328,10 @@ export class OrdersService {
         });
 
         if (dec.count !== 1) {
-          throw new ConflictException({ ...ERR.OUT_OF_STOCK, details: { variantId: it.variantId } } as any);
+          throw new ConflictException({
+            ...ERR.OUT_OF_STOCK,
+            details: { variantId: it.variantId },
+          } as any);
         }
 
         const unitPrice = (p.price ?? 0) + (v.priceDelta ?? 0);
@@ -278,7 +341,7 @@ export class OrdersService {
         // 사용자에게 보여줄 옵션 요약(snapshot)
         const size = v.sizeOption?.value;
         const color = v.colorOption?.value;
-        const optionSummary = [color, size].filter(Boolean).join(" / ") || null;
+        const optionSummary = [color, size].filter(Boolean).join(' / ') || null;
 
         orderItemsData.push({
           productId: p.id,
@@ -291,7 +354,7 @@ export class OrdersService {
         });
       }
 
-      const userId = this.toUserId(user);
+      const userId = user ? this.toUserId(user) : null;
 
       const order = await tx.order.create({
         data: {
@@ -326,14 +389,14 @@ export class OrdersService {
 
   async list(user: CurrentUser, query: any) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
-    const isAdmin = String((user as any)?.role ?? "").toLowerCase() === "admin";
+    const isAdmin = String((user as any)?.role ?? '').toLowerCase() === 'admin';
     const where: any = isAdmin ? {} : { userId: this.toUserId(user) };
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.order.count({ where }),
       this.prisma.order.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip,
         take,
         select: {
@@ -407,20 +470,25 @@ export class OrdersService {
     return { data, meta: { page, size, total } };
   }
 
-  async detail(user: CurrentUser, id: string) {
+  async detail(user: CurrentUser | null, id: string, phone?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: {
         items: true,
         return: true,
-        refundLogs: { orderBy: { createdAt: "desc" } },
+        refundLogs: { orderBy: { createdAt: 'desc' } },
         user: { select: { id: true } },
       },
     });
 
-    if (!order) throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
+    if (!order) {
+      throw new NotFoundException({
+        ...ERR.ORDER_NOT_FOUND,
+        details: { id },
+      } as any);
+    }
 
-    this.ensureOwnerOrAdmin(user, order.userId);
+    this.ensureOrderAccess(user, order, phone);
 
     return {
       id: order.id,
@@ -428,13 +496,20 @@ export class OrdersService {
       createdAt: order.createdAt.toISOString(),
       expiresAt: order.expiresAt.toISOString(),
 
-      payment: { method: order.paymentMethod, depositor: order.depositor ?? null },
+      payment: {
+        method: order.paymentMethod,
+        depositor: order.depositor ?? null,
+      },
 
       receiver: {
         name: order.receiverName,
         phone: order.receiverPhone,
         email: order.receiverEmail ?? null,
-        address: { zip: order.zip, address1: order.address1, address2: order.address2 },
+        address: {
+          zip: order.zip,
+          address1: order.address1,
+          address2: order.address2,
+        },
         memo: order.memo ?? null,
       },
 
@@ -483,16 +558,25 @@ export class OrdersService {
     };
   }
 
-  async confirmDelivered(user: CurrentUser, id: string) {
+  async confirmDelivered(user: CurrentUser | null, id: string, phone?: string) {
     const order = await this.prisma.order.findUnique({ where: { id } });
-    if (!order) throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
 
-    this.ensureOwnerOrAdmin(user, order.userId);
+    if (!order) {
+      throw new NotFoundException({
+        ...ERR.ORDER_NOT_FOUND,
+        details: { id },
+      } as any);
+    }
+
+    this.ensureOrderAccess(user, order, phone);
 
     if (order.status === OrderStatus.DELIVERED) return true;
 
     if (order.status !== OrderStatus.SHIPPED) {
-      throw new HttpException({ ...ERR.INVALID_ORDER_STATUS, details: { status: order.status } }, 400);
+      throw new HttpException(
+        { ...ERR.INVALID_ORDER_STATUS, details: { status: order.status } },
+        400,
+      );
     }
 
     await this.prisma.order.update({
@@ -503,23 +587,31 @@ export class OrdersService {
     return true;
   }
 
-  async cancelRequest(user: CurrentUser, id: string) {
+  async cancelRequest(user: CurrentUser | null, id: string, phone?: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: { items: true },
     });
-    if (!order) throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
 
-    this.ensureOwnerOrAdmin(user, order.userId);
+    if (!order) {
+      throw new NotFoundException({
+        ...ERR.ORDER_NOT_FOUND,
+        details: { id },
+      } as any);
+    }
+
+    this.ensureOrderAccess(user, order, phone);
 
     if (order.status === OrderStatus.CANCELED) return true;
 
     if (order.status !== OrderStatus.AWAITING_DEPOSIT) {
-      throw new HttpException({ ...ERR.INVALID_ORDER_STATUS, details: { status: order.status } }, 400);
+      throw new HttpException(
+        { ...ERR.INVALID_ORDER_STATUS, details: { status: order.status } },
+        400,
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {
-      // 재고 복구
       for (const it of order.items) {
         if (it.variantId) {
           await tx.productVariant.update({
@@ -538,23 +630,41 @@ export class OrdersService {
     return true;
   }
 
-  async returnRequest(user: CurrentUser, id: string, reason?: string, memo?: string) {
+  async returnRequest(
+    user: CurrentUser | null,
+    id: string,
+    reason?: string,
+    memo?: string,
+    phone?: string,
+  ) {
     const order = await this.prisma.order.findUnique({
       where: { id },
       include: { return: true },
     });
-    if (!order) throw new NotFoundException({ ...ERR.ORDER_NOT_FOUND, details: { id } } as any);
 
-    this.ensureOwnerOrAdmin(user, order.userId);
+    if (!order) {
+      throw new NotFoundException({
+        ...ERR.ORDER_NOT_FOUND,
+        details: { id },
+      } as any);
+    }
+
+    this.ensureOrderAccess(user, order, phone);
 
     if (order.status !== OrderStatus.DELIVERED) {
-      throw new HttpException({ ...ERR.RETURN_NOT_ALLOWED, details: { status: order.status } }, 400);
+      throw new HttpException(
+        { ...ERR.RETURN_NOT_ALLOWED, details: { status: order.status } },
+        400,
+      );
     }
 
     if (order.return) {
       throw new HttpException(
-        { ...ERR.RETURN_ALREADY_EXISTS, details: { returnId: order.return.id } },
-        409
+        {
+          ...ERR.RETURN_ALREADY_EXISTS,
+          details: { returnId: order.return.id },
+        },
+        409,
       );
     }
 

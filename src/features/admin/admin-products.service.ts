@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
-import { AdminUpsertProductDto } from "./dto/admin-product.dto";
-import { parsePageSize } from "../../shared/pagination";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { AdminUpsertProductDto } from './dto/admin-product.dto';
+import { parsePageSize } from '../../shared/pagination';
 
 @Injectable()
 export class AdminProductsService {
@@ -12,13 +12,13 @@ export class AdminProductsService {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
 
     const where: any = {};
-    const categorySlug = (query?.categorySlug ?? query?.category ?? "")
+    const categorySlug = (query?.categorySlug ?? query?.category ?? '')
       .toString()
       .trim();
     if (categorySlug) where.categorySlug = categorySlug;
 
-    const q = (query?.q ?? "").toString().trim();
-    if (q.length) where.name = { contains: q, mode: "insensitive" };
+    const q = (query?.q ?? '').toString().trim();
+    if (q.length) where.name = { contains: q, mode: 'insensitive' };
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.product.count({ where }),
@@ -26,7 +26,7 @@ export class AdminProductsService {
         where,
         skip,
         take,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         select: {
           id: true,
           categorySlug: true,
@@ -36,7 +36,7 @@ export class AdminProductsService {
           createdAt: true,
           images: {
             take: 1,
-            orderBy: { sortOrder: "asc" },
+            orderBy: { sortOrder: 'asc' },
             select: { url: true },
           },
         },
@@ -62,9 +62,9 @@ export class AdminProductsService {
     const product = await this.prisma.product.findUnique({
       where: { id },
       include: {
-        images: { orderBy: { sortOrder: "asc" } },
-        options: { orderBy: { id: "asc" } },
-        variants: { orderBy: { id: "asc" } },
+        images: { orderBy: { sortOrder: 'asc' } },
+        options: { orderBy: { id: 'asc' } },
+        variants: { orderBy: { id: 'asc' } },
       },
     });
 
@@ -79,20 +79,20 @@ export class AdminProductsService {
       if (v.sizeOptionId != null) {
         stockByOptionId.set(
           v.sizeOptionId,
-          (stockByOptionId.get(v.sizeOptionId) ?? 0) + stock
+          (stockByOptionId.get(v.sizeOptionId) ?? 0) + stock,
         );
       }
 
       if (v.colorOptionId != null) {
         stockByOptionId.set(
           v.colorOptionId,
-          (stockByOptionId.get(v.colorOptionId) ?? 0) + stock
+          (stockByOptionId.get(v.colorOptionId) ?? 0) + stock,
         );
       }
     }
 
     // options -> optionGroups (value 기반 + stock 포함)
-    const optionGroups = ["size", "color"].flatMap((key) => {
+    const optionGroups = ['size', 'color'].flatMap((key) => {
       const opts = product.options.filter((o) => o.groupKey === key);
       if (!opts.length) return [];
       return [
@@ -121,7 +121,7 @@ export class AdminProductsService {
         lookMdUrl: product.lookMdUrl,
         isActive: product.isActive,
         images: product.images.map((i) => i.url),
-        optionGroups, 
+        optionGroups,
       },
     };
   }
@@ -133,14 +133,14 @@ export class AdminProductsService {
    * - optionId/variantId는 백엔드 내부 책임(프론트 노출 ❌)
    */
   async upsert(productId: number | null, dto: AdminUpsertProductDto) {
-    const isLook = dto.categorySlug === "look"; // look 상품이면 옵션/variant 없어도 OK
+    const isLook = dto.categorySlug === 'look'; // look 상품이면 옵션/variant 없어도 OK
 
     return this.prisma.$transaction(async (tx) => {
       // 기본 필드 저장
       const baseData: any = {
         categorySlug: dto.categorySlug,
         name: dto.name,
-        price: isLook ? 0 : dto.price ?? 0,
+        price: isLook ? 0 : (dto.price ?? 0),
         description: dto.description ?? null,
 
         sizeGuideText: dto.sizeGuideText ?? null,
@@ -177,18 +177,20 @@ export class AdminProductsService {
 
       //  옵션/바리언트 전량 재생성 (value 기준)
       if (dto.optionGroups) {
-        await tx.productVariant.deleteMany({ where: { productId: product.id } });
+        await tx.productVariant.deleteMany({
+          where: { productId: product.id },
+        });
         await tx.productOption.deleteMany({ where: { productId: product.id } });
 
         // optionGroups 정규화(size/color만)
         const groups = dto.optionGroups
-          .filter((g) => g && (g.key === "size" || g.key === "color"))
+          .filter((g) => g && (g.key === 'size' || g.key === 'color'))
           .map((g) => ({
             key: g.key,
             label: g.label ?? g.key.toUpperCase(),
             options: (g.options || [])
               .map((o) => ({
-                value: String(o.value ?? "").trim(),
+                value: String(o.value ?? '').trim(),
                 stock: Number.isFinite(Number(o.stock))
                   ? Math.max(0, Number(o.stock))
                   : 0,
@@ -215,7 +217,7 @@ export class AdminProductsService {
         // ProductOption 생성 (value 저장)
         const createdOptions: Array<{
           id: number;
-          groupKey: "size" | "color";
+          groupKey: 'size' | 'color';
           value: string;
           stock: number;
         }> = [];
@@ -234,15 +236,15 @@ export class AdminProductsService {
 
             createdOptions.push({
               id: row.id,
-              groupKey: row.groupKey as "size" | "color",
+              groupKey: row.groupKey as 'size' | 'color',
               value: row.value,
               stock: o.stock,
             });
           }
         }
 
-        const sizes = createdOptions.filter((o) => o.groupKey === "size");
-        const colors = createdOptions.filter((o) => o.groupKey === "color");
+        const sizes = createdOptions.filter((o) => o.groupKey === 'size');
+        const colors = createdOptions.filter((o) => o.groupKey === 'color');
 
         // variant 생성 규칙(2그룹 기준)
         // - size+color 둘 다 있으면: 조합 생성, stock=min(sizeStock,colorStock)

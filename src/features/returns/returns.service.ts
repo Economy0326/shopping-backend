@@ -1,7 +1,7 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
-import { parsePageSize } from "../../shared/pagination";
-import type { CurrentUser } from "../../shared/current-user";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { parsePageSize } from '../../shared/pagination';
+import type { CurrentUser } from '../../shared/current-user';
 
 @Injectable()
 export class ReturnsService {
@@ -11,18 +11,22 @@ export class ReturnsService {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
 
     const where: any =
-      user.role === "admin"
-        ? {}
-        : { order: { userId: user.sub } };
+      user.role === 'admin' ? {} : { order: { userId: user.sub } };
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.return.count({ where }),
       this.prisma.return.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip,
         take,
-        select: { id: true, orderId: true, status: true, createdAt: true, reason: true },
+        select: {
+          id: true,
+          orderId: true,
+          status: true,
+          createdAt: true,
+          reason: true,
+        },
       }),
     ]);
 
@@ -36,7 +40,7 @@ export class ReturnsService {
     });
     if (!row) return null;
 
-    if (user.role !== "admin" && row.order.userId !== user.sub) return null;
+    if (user.role !== 'admin' && row.order.userId !== user.sub) return null;
 
     return {
       id: row.id,

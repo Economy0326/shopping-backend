@@ -1,5 +1,5 @@
-import { IsOptional, IsString, ValidateNested } from "class-validator";
-import { Type } from "class-transformer";
+import { IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 class AddressDto {
   @IsOptional() @IsString() zip?: string;
@@ -8,8 +8,8 @@ class AddressDto {
 }
 
 export class UpdateProfileDto {
-  @IsOptional() @IsString() name?: string;    
-  @IsOptional() @IsString() displayName?: string; 
+  @IsOptional() @IsString() name?: string;
+  @IsOptional() @IsString() displayName?: string;
   @IsOptional() @IsString() phone?: string;
 
   @IsOptional()

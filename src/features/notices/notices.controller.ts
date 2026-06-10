@@ -1,10 +1,21 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query, UseGuards } from "@nestjs/common";
-import { NoticesService } from "./notices.service";
-import { NoticeDto } from "./dto/notice.dto";
-import { JwtAccessGuard } from "../auth/guards/jwt-access.guard";
-import { AdminGuard } from "../../shared/guards/admin.guard";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { NoticesService } from './notices.service';
+import { NoticeDto } from './dto/notice.dto';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
+import { AdminGuard } from '../../shared/guards/admin.guard';
 
-@Controller("notices")
+@Controller('notices')
 export class NoticesController {
   constructor(private readonly notices: NoticesService) {}
 
@@ -13,8 +24,8 @@ export class NoticesController {
     return this.notices.list(query);
   }
 
-  @Get(":id")
-  async detail(@Param("id") id: string) {
+  @Get(':id')
+  async detail(@Param('id') id: string) {
     return this.notices.detail(id);
   }
 
@@ -27,16 +38,16 @@ export class NoticesController {
   }
 
   @UseGuards(JwtAccessGuard, AdminGuard)
-  @Put(":id")
+  @Put(':id')
   @HttpCode(200)
-  async update(@Param("id") id: string, @Body() dto: NoticeDto) {
+  async update(@Param('id') id: string, @Body() dto: NoticeDto) {
     return this.notices.update(id, dto);
   }
 
   @UseGuards(JwtAccessGuard, AdminGuard)
-  @Delete(":id")
+  @Delete(':id')
   @HttpCode(200)
-  async remove(@Param("id") id: string) {
+  async remove(@Param('id') id: string) {
     return this.notices.remove(id);
   }
 }

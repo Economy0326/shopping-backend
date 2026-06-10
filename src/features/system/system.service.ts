@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
-import { ERR } from "../../shared/errors";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { ERR } from '../../shared/errors';
 
-const ALLOWED_KEYS = new Set(["returns", "bankAccount", "shipping", "faq"]);
+const ALLOWED_KEYS = new Set(['returns', 'bankAccount', 'shipping', 'faq']);
 
 @Injectable()
 export class SystemService {
@@ -10,7 +10,10 @@ export class SystemService {
 
   async policy(key: string) {
     if (!ALLOWED_KEYS.has(key)) {
-      throw new NotFoundException({ ...ERR.NOT_FOUND, details: { key } } as any);
+      throw new NotFoundException({
+        ...ERR.NOT_FOUND,
+        details: { key },
+      } as any);
     }
 
     const row = await this.prisma.systemPolicy.findUnique({ where: { key } });
@@ -19,7 +22,7 @@ export class SystemService {
     if (!row) {
       return {
         key,
-        value: "",
+        value: '',
         updatedAt: null,
       };
     }
@@ -33,7 +36,10 @@ export class SystemService {
 
   async updatePolicy(key: string, value: string) {
     if (!ALLOWED_KEYS.has(key)) {
-      throw new NotFoundException({ ...ERR.NOT_FOUND, details: { key } } as any);
+      throw new NotFoundException({
+        ...ERR.NOT_FOUND,
+        details: { key },
+      } as any);
     }
 
     const row = await this.prisma.systemPolicy.upsert({

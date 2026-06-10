@@ -1,9 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
-import { parsePageSize } from "../../shared/pagination";
-import { makeId } from "../../shared/ids";
-import { ERR } from "../../shared/errors";
-import { NoticeDto } from "./dto/notice.dto";
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { parsePageSize } from '../../shared/pagination';
+import { makeId } from '../../shared/ids';
+import { ERR } from '../../shared/errors';
+import { NoticeDto } from './dto/notice.dto';
 
 @Injectable()
 export class NoticesService {
@@ -15,7 +15,7 @@ export class NoticesService {
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.notice.count({}),
       this.prisma.notice.findMany({
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip,
         take,
         select: { id: true, title: true, body: true, createdAt: true },
@@ -30,12 +30,13 @@ export class NoticesService {
       where: { id },
       select: { id: true, title: true, body: true, createdAt: true },
     });
-    if (!row) throw new NotFoundException({ ...ERR.NOT_FOUND, details: { id } } as any);
+    if (!row)
+      throw new NotFoundException({ ...ERR.NOT_FOUND, details: { id } } as any);
     return row;
   }
 
   async create(dto: NoticeDto) {
-    const id = makeId("n");
+    const id = makeId('n');
     return this.prisma.notice.create({
       data: { id, title: dto.title, body: dto.body },
       select: { id: true },
@@ -44,7 +45,10 @@ export class NoticesService {
 
   async update(id: string, dto: NoticeDto) {
     await this.detail(id);
-    await this.prisma.notice.update({ where: { id }, data: { title: dto.title, body: dto.body } });
+    await this.prisma.notice.update({
+      where: { id },
+      data: { title: dto.title, body: dto.body },
+    });
     return true;
   }
 

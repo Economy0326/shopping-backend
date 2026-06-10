@@ -1,8 +1,8 @@
-import { BuyerDto } from "./buyer.dto";
-import { OrderAmountsDto } from "../../../shared/dto/orders/order-amounts.dto";
-import { OrderShippingDto } from "../../../shared/dto/orders/order-shipping.dto";
-import { OrderReceiverDetailDto } from "../../../shared/dto/orders/order-receiver.dto";
-import { OrderItemDto } from "../../../shared/dto/orders/order-item.dto";
+import { BuyerDto } from './buyer.dto';
+import { OrderAmountsDto } from '../../../shared/dto/orders/order-amounts.dto';
+import { OrderShippingDto } from '../../../shared/dto/orders/order-shipping.dto';
+import { OrderReceiverDetailDto } from '../../../shared/dto/orders/order-receiver.dto';
+import { OrderItemDto } from '../../../shared/dto/orders/order-item.dto';
 
 export class AdminOrderDetailDto {
   id!: string;
@@ -26,7 +26,12 @@ export class AdminOrderDetailDto {
 
   items!: OrderItemDto[];
 
-  refundLogs!: Array<{ id: string; amount: number; memo: string | null; createdAt: string }>;
+  refundLogs!: Array<{
+    id: string;
+    amount: number;
+    memo: string | null;
+    createdAt: string;
+  }>;
 
   return!: null | {
     id: string;

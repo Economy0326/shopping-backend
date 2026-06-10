@@ -1,8 +1,16 @@
-import { OrderStatus, ReturnStatus } from "@prisma/client";
-import { emailToName } from "../../../shared/name";
+import { OrderStatus, ReturnStatus } from '@prisma/client';
+import { emailToName } from '../../../shared/name';
+
+type AdminUser = {
+  id: number | string;
+  email: string;
+  displayName: string | null;
+  phone: string | null;
+} | null;
 
 type PrismaOrderListRow = {
   id: string;
+  userId?: number | null;
   status: OrderStatus;
   createdAt: Date;
   expiresAt: Date | null;
@@ -20,28 +28,20 @@ type PrismaOrderListRow = {
   shippedAt: Date | null;
   deliveredAt: Date | null;
 
-  user: {
-    id: string;
-    email: string;
-    displayName: string | null;
-    phone: string | null;
-  };
+  user: AdminUser;
 
-  // 대표 상품용
   items: Array<{
     name: string;
     thumbnailUrl: string | null;
     optionSummary: string | null;
   }>;
 
-  // 총 아이템 개수용
   _count: {
     items: number;
   };
 
-  // 반품 상태 표시용
   return: null | {
-    id: string;
+    id: number | string;
     status: ReturnStatus;
     reason: string | null;
     memo: string | null;
@@ -51,6 +51,7 @@ type PrismaOrderListRow = {
 
 type PrismaOrderDetailRow = {
   id: string;
+  userId?: number | null;
   status: OrderStatus;
   createdAt: Date;
   expiresAt: Date | null;
@@ -75,17 +76,12 @@ type PrismaOrderDetailRow = {
 
   grandTotal: number;
 
-  user: {
-    id: string;
-    email: string;
-    displayName: string | null;
-    phone: string | null;
-  };
+  user: AdminUser;
 
   items: Array<{
     id: string;
-    productId: string;
-    variantId: string | null;
+    productId: number | string;
+    variantId: number | string | null;
     name: string;
     qty: number;
     price: number;
@@ -94,7 +90,7 @@ type PrismaOrderDetailRow = {
   }>;
 
   return: null | {
-    id: string;
+    id: number | string;
     status: ReturnStatus;
     reason: string | null;
     memo: string | null;
@@ -111,7 +107,11 @@ type PrismaOrderDetailRow = {
 
 export class OrderMapper {
   static toAdminListItem(o: PrismaOrderListRow) {
-    const buyerName = o.user.displayName ?? emailToName(o.user.email);
+    const isGuestOrder = !o.user;
+
+    const buyerName = isGuestOrder
+      ? o.receiverName
+      : (o.user?.displayName ?? emailToName(o.user?.email ?? ''));
 
     return {
       id: o.id,
@@ -119,11 +119,14 @@ export class OrderMapper {
       createdAt: o.createdAt,
       expiresAt: o.expiresAt,
 
+      isGuestOrder,
+      ordererType: isGuestOrder ? 'guest' : 'member',
+
       buyer: {
-        id: o.user.id,
-        email: o.user.email,
+        id: o.user?.id ?? null,
+        email: o.user?.email ?? o.receiverEmail ?? null,
         name: buyerName,
-        phone: o.user.phone ?? null,
+        phone: o.user?.phone ?? o.receiverPhone ?? null,
       },
 
       receiver: {
@@ -172,10 +175,15 @@ export class OrderMapper {
   }
 
   static toAdminDetail(order: PrismaOrderDetailRow) {
-    const buyerName = order.user.displayName ?? emailToName(order.user.email);
+    const isGuestOrder = !order.user;
+
+    const buyerName = isGuestOrder
+      ? order.receiverName
+      : (order.user?.displayName ?? emailToName(order.user?.email ?? ''));
+
     const itemsTotal = (order.items || []).reduce(
       (sum, it) => sum + it.price * it.qty,
-      0
+      0,
     );
 
     return {
@@ -183,15 +191,19 @@ export class OrderMapper {
       status: order.status,
       createdAt: order.createdAt,
       expiresAt: order.expiresAt,
+
       shippedAt: order.shippedAt ? order.shippedAt.toISOString() : null,
       deliveredAt: order.deliveredAt ? order.deliveredAt.toISOString() : null,
       canceledAt: order.canceledAt ? order.canceledAt.toISOString() : null,
 
+      isGuestOrder,
+      ordererType: isGuestOrder ? 'guest' : 'member',
+
       buyer: {
-        id: order.user.id,
-        email: order.user.email,
+        id: order.user?.id ?? null,
+        email: order.user?.email ?? order.receiverEmail ?? null,
         name: buyerName,
-        phone: order.user.phone ?? null,
+        phone: order.user?.phone ?? order.receiverPhone ?? null,
       },
 
       receiver: {

@@ -1,16 +1,16 @@
-import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
-import type { Response } from "express";
-import { JwtService } from "@nestjs/jwt";
-import * as bcrypt from "bcryptjs";
-import { PrismaService } from "../../prisma/prisma.service";
-import { RegisterDto } from "./dto/register.dto";
-import { LoginDto } from "./dto/login.dto";
-import { ERR } from "../../shared/errors";
-import { setRefreshCookie, clearRefreshCookie } from "./auth.cookies";
-import { ChangePasswordDto } from "./dto/change-password.dto";
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import type { Response } from 'express';
+import { JwtService } from '@nestjs/jwt';
+import * as bcrypt from 'bcryptjs';
+import { PrismaService } from '../../prisma/prisma.service';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { ERR } from '../../shared/errors';
+import { setRefreshCookie, clearRefreshCookie } from './auth.cookies';
+import { ChangePasswordDto } from './dto/change-password.dto';
 
 // ✅ type은 클래스 밖에서 선언
-type AccessPayload = { sub: number; email: string; role: "user" | "admin" };
+type AccessPayload = { sub: number; email: string; role: 'user' | 'admin' };
 type RefreshPayload = { sub: number; tokenId: string };
 
 // ✅ "15m", "14d" 같은 env 값을 seconds(number)로 변환
@@ -21,7 +21,8 @@ function parseExpiresToSeconds(input: string | undefined, fallbackSec: number) {
 
   const n = Number(m[1]);
   const u = m[2].toLowerCase();
-  const mul = u === "s" ? 1 : u === "m" ? 60 : u === "h" ? 3600 : u === "d" ? 86400 : 1;
+  const mul =
+    u === 's' ? 1 : u === 'm' ? 60 : u === 'h' ? 3600 : u === 'd' ? 86400 : 1;
 
   return n * mul;
 }
@@ -32,11 +33,25 @@ function addSeconds(d: Date, sec: number) {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService, private readonly jwt: JwtService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly jwt: JwtService,
+  ) {}
 
-  private async signAccess(user: { id: number; email: string; role: "user" | "admin" }) {
-    const payload: AccessPayload = { sub: user.id, email: user.email, role: user.role };
-    const expiresInSec = parseExpiresToSeconds(process.env.ACCESS_EXPIRES_IN, 15 * 60);
+  private async signAccess(user: {
+    id: number;
+    email: string;
+    role: 'user' | 'admin';
+  }) {
+    const payload: AccessPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+    };
+    const expiresInSec = parseExpiresToSeconds(
+      process.env.ACCESS_EXPIRES_IN,
+      15 * 60,
+    );
 
     return this.jwt.signAsync(payload, {
       secret: process.env.JWT_ACCESS_SECRET!,
@@ -49,7 +64,10 @@ export class AuthService {
       sub: userId,
       tokenId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     };
-    const expiresInSec = parseExpiresToSeconds(process.env.REFRESH_EXPIRES_IN, 14 * 86400);
+    const expiresInSec = parseExpiresToSeconds(
+      process.env.REFRESH_EXPIRES_IN,
+      14 * 86400,
+    );
 
     return this.jwt.signAsync(payload, {
       secret: process.env.JWT_REFRESH_SECRET!,
@@ -64,7 +82,10 @@ export class AuthService {
    * - DB에는 hash만 저장
    */
   private async issueRefreshSession(userId: number, refreshToken: string) {
-    const expiresInSec = parseExpiresToSeconds(process.env.REFRESH_EXPIRES_IN, 14 * 86400);
+    const expiresInSec = parseExpiresToSeconds(
+      process.env.REFRESH_EXPIRES_IN,
+      14 * 86400,
+    );
     const tokenHash = await bcrypt.hash(refreshToken, 10);
     const expiresAt = addSeconds(new Date(), expiresInSec);
 
@@ -87,18 +108,27 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto, res: Response) {
-    const exist = await this.prisma.user.findUnique({ where: { email: dto.email } });
+    const exist = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
     if (exist) {
-      throw new HttpException({ ...ERR.AUTH_EMAIL_EXISTS, details: {} }, HttpStatus.CONFLICT);
+      throw new HttpException(
+        { ...ERR.AUTH_EMAIL_EXISTS, details: {} },
+        HttpStatus.CONFLICT,
+      );
     }
 
     const pwHash = await bcrypt.hash(dto.password, 10);
     const user = await this.prisma.user.create({
-      data: { email: dto.email, password: pwHash, role: "user" },
+      data: { email: dto.email, password: pwHash, role: 'user' },
       select: { id: true, email: true, role: true, createdAt: true },
     });
 
-    const accessToken = await this.signAccess({ id: user.id, email: user.email, role: user.role });
+    const accessToken = await this.signAccess({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     const refreshToken = await this.signRefresh(user.id);
     await this.issueRefreshSession(user.id, refreshToken);
@@ -115,15 +145,25 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new HttpException({ ...ERR.AUTH_INVALID_CREDENTIALS, details: {} }, HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        { ...ERR.AUTH_INVALID_CREDENTIALS, details: {} },
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     const ok = await bcrypt.compare(dto.password, user.password);
     if (!ok) {
-      throw new HttpException({ ...ERR.AUTH_INVALID_CREDENTIALS, details: {} }, HttpStatus.UNAUTHORIZED);
+      throw new HttpException(
+        { ...ERR.AUTH_INVALID_CREDENTIALS, details: {} },
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
-    const accessToken = await this.signAccess({ id: user.id, email: user.email, role: user.role });
+    const accessToken = await this.signAccess({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    });
 
     const refreshToken = await this.signRefresh(user.id);
     await this.issueRefreshSession(user.id, refreshToken);
@@ -132,12 +172,19 @@ export class AuthService {
     return { accessToken, user: { id: user.id, role: user.role } };
   }
 
-  async me(payload: { sub: number; email: string; role: "user" | "admin" }) {
+  async me(payload: { sub: number; email: string; role: 'user' | 'admin' }) {
     return { id: payload.sub, email: payload.email, role: payload.role };
   }
 
-  async refresh(payload: { sub: number; email: string; role: "user" | "admin" }, res: Response) {
-    const accessToken = await this.signAccess({ id: payload.sub, email: payload.email, role: payload.role });
+  async refresh(
+    payload: { sub: number; email: string; role: 'user' | 'admin' },
+    res: Response,
+  ) {
+    const accessToken = await this.signAccess({
+      id: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    });
 
     // ✅ refresh 회전: 새 refresh 발급 + 기존 세션 revoke + 새 세션 create
     const newRefresh = await this.signRefresh(payload.sub);
@@ -165,10 +212,18 @@ export class AuthService {
       where: { id: userId },
       select: { id: true, password: true },
     });
-    if (!user) throw new HttpException({ ...ERR.NOT_FOUND, details: {} }, HttpStatus.NOT_FOUND);
+    if (!user)
+      throw new HttpException(
+        { ...ERR.NOT_FOUND, details: {} },
+        HttpStatus.NOT_FOUND,
+      );
 
     const ok = await bcrypt.compare(dto.currentPassword, user.password);
-    if (!ok) throw new HttpException({ ...ERR.AUTH_INVALID_CREDENTIALS, details: {} }, HttpStatus.UNAUTHORIZED);
+    if (!ok)
+      throw new HttpException(
+        { ...ERR.AUTH_INVALID_CREDENTIALS, details: {} },
+        HttpStatus.UNAUTHORIZED,
+      );
 
     const newHash = await bcrypt.hash(dto.newPassword, 10);
 
@@ -185,41 +240,65 @@ export class AuthService {
 
   async passwordResetRequest(email: string) {
     // Always succeed to avoid user enumeration
-    const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true, email: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
     if (!user) return true;
 
-    const expiresInSec = parseExpiresToSeconds(process.env.PW_RESET_EXPIRES_IN, 60 * 60); // default 1h
+    const expiresInSec = parseExpiresToSeconds(
+      process.env.PW_RESET_EXPIRES_IN,
+      60 * 60,
+    ); // default 1h
     const token = await this.jwt.signAsync(
-      { sub: user.id, type: "pw-reset" },
-      { secret: process.env.JWT_PASSWORD_RESET_SECRET!, expiresIn: expiresInSec }
+      { sub: user.id, type: 'pw-reset' },
+      {
+        secret: process.env.JWT_PASSWORD_RESET_SECRET!,
+        expiresIn: expiresInSec,
+      },
     );
 
-    console.log("[password-reset] token for:", user.email, token);
+    console.log('[password-reset] token for:', user.email, token);
 
     return true;
   }
 
-  async passwordResetConfirm(token: string, newPassword: string, res: Response) {
+  async passwordResetConfirm(
+    token: string,
+    newPassword: string,
+    res: Response,
+  ) {
     try {
-      const payload: any = await this.jwt.verifyAsync(token, { secret: process.env.JWT_PASSWORD_RESET_SECRET! });
-      if (!payload || payload.type !== "pw-reset" || !payload.sub) {
-        throw new Error("invalid token");
+      const payload: any = await this.jwt.verifyAsync(token, {
+        secret: process.env.JWT_PASSWORD_RESET_SECRET!,
+      });
+      if (!payload || payload.type !== 'pw-reset' || !payload.sub) {
+        throw new Error('invalid token');
       }
 
       const userId = Number(payload.sub);
-      const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-      if (!user) throw new Error("user not found");
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (!user) throw new Error('user not found');
 
       const newHash = await bcrypt.hash(newPassword, 10);
-      await this.prisma.user.update({ where: { id: userId }, data: { password: newHash } });
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { password: newHash },
+      });
 
       // ✅ reset 성공 시 refresh cookie clear + 모든 세션 revoke
       clearRefreshCookie(res);
       await this.revokeAllRefreshSessions(userId);
 
       return true;
-    } catch (e) {
-      throw new HttpException({ ...ERR.INVALID_TOKEN, details: {} }, HttpStatus.BAD_REQUEST);
+    } catch {
+      throw new HttpException(
+        { ...ERR.INVALID_TOKEN, details: {} },
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 }

@@ -10,14 +10,14 @@ import {
   Patch,
   Query,
   UseGuards,
-} from "@nestjs/common";
-import { JwtAccessGuard } from "../auth/guards/jwt-access.guard";
-import { AdminGuard } from "../../shared/guards/admin.guard";
-import { AdminUpsertProductDto } from "./dto/admin-product.dto";
-import { AdminProductsService } from "./admin-products.service";
+} from '@nestjs/common';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
+import { AdminGuard } from '../../shared/guards/admin.guard';
+import { AdminUpsertProductDto } from './dto/admin-product.dto';
+import { AdminProductsService } from './admin-products.service';
 
 @UseGuards(JwtAccessGuard, AdminGuard)
-@Controller("admin/products")
+@Controller('admin/products')
 export class AdminProductsController {
   constructor(private readonly service: AdminProductsService) {}
 
@@ -28,8 +28,8 @@ export class AdminProductsController {
   }
 
   /**  관리자 상품 상세(편집용) - optionGroups를 value 기반으로 내려줌 */
-  @Get(":id")
-  detail(@Param("id") id: string) {
+  @Get(':id')
+  detail(@Param('id') id: string) {
     return this.service.detail(Number(id));
   }
 
@@ -40,22 +40,22 @@ export class AdminProductsController {
     return this.service.upsert(null, dto);
   }
 
-  @Put(":id")
+  @Put(':id')
   @HttpCode(200)
-  update(@Param("id") id: string, @Body() dto: AdminUpsertProductDto) {
+  update(@Param('id') id: string, @Body() dto: AdminUpsertProductDto) {
     return this.service.upsert(Number(id), dto);
   }
 
-  @Patch(":id")
+  @Patch(':id')
   @HttpCode(200)
-  patch(@Param("id") id: string, @Body() dto: AdminUpsertProductDto) {
+  patch(@Param('id') id: string, @Body() dto: AdminUpsertProductDto) {
     return this.service.upsert(Number(id), dto);
   }
 
   /**  운영은 soft delete 권장(isActive=false) */
-  @Delete(":id")
+  @Delete(':id')
   @HttpCode(200)
-  remove(@Param("id") id: string) {
+  remove(@Param('id') id: string) {
     return this.service.remove(Number(id));
   }
 }

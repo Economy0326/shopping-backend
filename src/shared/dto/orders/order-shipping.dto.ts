@@ -1,5 +1,5 @@
 // 배송 정보
-import { IsOptional, IsString, IsDateString } from "class-validator";
+import { IsOptional, IsString, IsDateString } from 'class-validator';
 
 export class OrderShippingDto {
   @IsOptional()

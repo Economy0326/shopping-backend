@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class UsersService {
@@ -33,8 +33,10 @@ export class UsersService {
 
     if (data?.address) {
       if (data.address.zip !== undefined) allowed.defaultZip = data.address.zip;
-      if (data.address.address1 !== undefined) allowed.defaultAddress1 = data.address.address1;
-      if (data.address.address2 !== undefined) allowed.defaultAddress2 = data.address.address2;
+      if (data.address.address1 !== undefined)
+        allowed.defaultAddress1 = data.address.address1;
+      if (data.address.address2 !== undefined)
+        allowed.defaultAddress2 = data.address.address2;
     }
 
     // ✅ 프론트가 setUser에 쓰기 좋게 전체 내려줌(추천)
@@ -54,7 +56,10 @@ export class UsersService {
     });
   }
 
-  async setDefaultAddress(userId: number, address: { zip?: string; address1?: string; address2?: string }) {
+  async setDefaultAddress(
+    userId: number,
+    address: { zip?: string; address1?: string; address2?: string },
+  ) {
     return this.prisma.user.update({
       where: { id: userId },
       data: {

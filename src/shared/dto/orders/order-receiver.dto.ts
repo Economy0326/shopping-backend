@@ -1,5 +1,5 @@
-import { IsOptional, IsString, ValidateNested } from "class-validator";
-import { Type } from "class-transformer";
+import { IsOptional, IsString, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 
 // 주소(address) shape
 export class OrderReceiverAddressDto {

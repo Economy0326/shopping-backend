@@ -199,14 +199,12 @@ model ProductVariant {
 }
 
 model Order {
-  // 문자열 주문번호 (makeId("O") 등)
   id String @id
 
-  userId Int
+  userId Int?
   status OrderStatus @default(AWAITING_DEPOSIT)
 
   createdAt DateTime @default(now())
-  // ✅ H=1: expiresAt 필수
   expiresAt DateTime
 
   shippedAt   DateTime?
@@ -230,7 +228,7 @@ model Order {
 
   grandTotal Int @default(0)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   items      OrderItem[]
   return     Return?

@@ -1,14 +1,24 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query, UseGuards } from "@nestjs/common";
-import { JwtAccessGuard } from "../auth/guards/jwt-access.guard";
-import { AdminGuard } from "../../shared/guards/admin.guard";
-import { User } from "../../shared/decorators/user.decorator";
-import type { CurrentUser } from "../../shared/current-user";
-import { AsksService } from "./asks.service";
-import { AskDto } from "./dto/ask.dto";
-import { ReplyDto } from "./dto/reply.dto";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
+import { AdminGuard } from '../../shared/guards/admin.guard';
+import { User } from '../../shared/decorators/user.decorator';
+import type { CurrentUser } from '../../shared/current-user';
+import { AsksService } from './asks.service';
+import { AskDto } from './dto/ask.dto';
+import { ReplyDto } from './dto/reply.dto';
 
 @UseGuards(JwtAccessGuard)
-@Controller("asks")
+@Controller('asks')
 export class AsksController {
   constructor(private readonly asks: AsksService) {}
 
@@ -17,8 +27,8 @@ export class AsksController {
     return this.asks.list(user, query);
   }
 
-  @Get(":id")
-  async detail(@User() user: CurrentUser, @Param("id") id: string) {
+  @Get(':id')
+  async detail(@User() user: CurrentUser, @Param('id') id: string) {
     return this.asks.detail(user, id);
   }
 
@@ -30,16 +40,20 @@ export class AsksController {
 
   // ✅ 관리자 reply (명세)
   @UseGuards(AdminGuard)
-  @Post(":id/replies")
+  @Post(':id/replies')
   @HttpCode(200)
-  async reply(@User() user: CurrentUser, @Param("id") id: string, @Body() dto: ReplyDto) {
+  async reply(
+    @User() user: CurrentUser,
+    @Param('id') id: string,
+    @Body() dto: ReplyDto,
+  ) {
     return this.asks.reply(user, id, dto.body);
   }
 
   // ✅ soft delete (본인 또는 admin)
-  @Delete(":id")
+  @Delete(':id')
   @HttpCode(200)
-  async remove(@User() user: CurrentUser, @Param("id") id: string) {
+  async remove(@User() user: CurrentUser, @Param('id') id: string) {
     return this.asks.remove(user, id);
   }
 }

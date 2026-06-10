@@ -1,5 +1,5 @@
 // 주문 상품 정보
-import { IsInt, IsOptional, IsString, Min } from "class-validator";
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class OrderItemDto {
   @IsInt() id!: number;

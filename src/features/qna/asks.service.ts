@@ -3,14 +3,14 @@ import {
   HttpException,
   Injectable,
   NotFoundException,
-} from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service";
-import { parsePageSize } from "../../shared/pagination";
-import { makeId } from "../../shared/ids";
-import { emailToName } from "../../shared/name";
-import type { CurrentUser } from "../../shared/current-user";
-import { ERR } from "../../shared/errors";
-import { AskStatus } from "@prisma/client";
+} from '@nestjs/common';
+import { PrismaService } from '../../prisma/prisma.service';
+import { parsePageSize } from '../../shared/pagination';
+import { makeId } from '../../shared/ids';
+import { emailToName } from '../../shared/name';
+import type { CurrentUser } from '../../shared/current-user';
+import { ERR } from '../../shared/errors';
+import { AskStatus } from '@prisma/client';
 
 @Injectable()
 export class AsksService {
@@ -23,11 +23,11 @@ export class AsksService {
   }
 
   private isAdmin(user: CurrentUser) {
-    return String((user as any)?.role ?? "").toLowerCase() === "admin";
+    return String((user as any)?.role ?? '').toLowerCase() === 'admin';
   }
 
   private toClientStatus(status: AskStatus | string | null | undefined) {
-    return String(status ?? "").toLowerCase();
+    return String(status ?? '').toLowerCase();
   }
 
   async list(user: CurrentUser, query: any) {
@@ -41,28 +41,33 @@ export class AsksService {
       if (uid === null) {
         throw new ForbiddenException({
           ...ERR.FORBIDDEN,
-          details: { reason: "Invalid_token_sub" },
+          details: { reason: 'Invalid_token_sub' },
         } as any);
       }
       where.userId = uid;
     }
 
-    const raw = (query?.status ?? "").toString().trim();
+    const raw = (query?.status ?? '').toString().trim();
     const s = raw.toUpperCase();
 
-    if (s === AskStatus.WAITING || s === AskStatus.ANSWERED || s === AskStatus.CLOSED) {
+    if (
+      s === AskStatus.WAITING ||
+      s === AskStatus.ANSWERED ||
+      s === AskStatus.CLOSED
+    ) {
       where.status = s as AskStatus;
     }
 
     // q search
-    const q = (query?.q ?? "").toString().trim();
-    if (q.length) where.OR = [{ title: { contains: q } }, { body: { contains: q } }];
+    const q = (query?.q ?? '').toString().trim();
+    if (q.length)
+      where.OR = [{ title: { contains: q } }, { body: { contains: q } }];
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.ask.count({ where }),
       this.prisma.ask.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip,
         take,
         select: {
@@ -101,7 +106,7 @@ export class AsksService {
         deletedAt: true,
         user: { select: { email: true } },
         replies: {
-          orderBy: { createdAt: "asc" },
+          orderBy: { createdAt: 'asc' },
           select: { id: true, body: true, isAdmin: true, createdAt: true },
         },
       },
@@ -116,7 +121,7 @@ export class AsksService {
     if (uid === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
-        details: { reason: "Invalid_token_sub" },
+        details: { reason: 'Invalid_token_sub' },
       } as any);
     }
 
@@ -142,7 +147,7 @@ export class AsksService {
     if (uid === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
-        details: { reason: "Invalid_token_sub" },
+        details: { reason: 'Invalid_token_sub' },
       } as any);
     }
 
@@ -151,10 +156,13 @@ export class AsksService {
     });
 
     if (cnt >= 3) {
-      throw new HttpException({ ...ERR.ASK_LIMIT_EXCEEDED, details: { limit: 3 } }, 409);
+      throw new HttpException(
+        { ...ERR.ASK_LIMIT_EXCEEDED, details: { limit: 3 } },
+        409,
+      );
     }
 
-    const id = makeId("q");
+    const id = makeId('q');
     const created = await this.prisma.ask.create({
       data: {
         id,
@@ -180,15 +188,18 @@ export class AsksService {
       select: { id: true, deletedAt: true },
     });
     if (!ask || ask.deletedAt) {
-      throw new NotFoundException({ ...ERR.NOT_FOUND, details: { id: askId } } as any);
+      throw new NotFoundException({
+        ...ERR.NOT_FOUND,
+        details: { id: askId },
+      } as any);
     }
 
-    const id = makeId("r");
+    const id = makeId('r');
     const adminId = this.userId(admin);
     if (adminId === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
-        details: { reason: "Invalid_token_sub" },
+        details: { reason: 'Invalid_token_sub' },
       } as any);
     }
 
@@ -227,7 +238,7 @@ export class AsksService {
     if (uid === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
-        details: { reason: "Invalid_token_sub" },
+        details: { reason: 'Invalid_token_sub' },
       } as any);
     }
 

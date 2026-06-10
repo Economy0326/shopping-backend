@@ -1,9 +1,17 @@
-import { Type } from "class-transformer";
-import { IsInt, Min, IsArray, IsDateString, IsOptional, IsString, ValidateNested } from "class-validator";
-import { OrderAmountsDto } from "../../../shared/dto/orders/order-amounts.dto";
-import { OrderItemDto } from "../../../shared/dto/orders/order-item.dto";
-import { OrderReceiverDetailDto } from "../../../shared/dto/orders/order-receiver.dto";
-import { OrderShippingDto } from "../../../shared/dto/orders/order-shipping.dto";
+import { Type } from 'class-transformer';
+import {
+  IsInt,
+  Min,
+  IsArray,
+  IsDateString,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
+import { OrderAmountsDto } from '../../../shared/dto/orders/order-amounts.dto';
+import { OrderItemDto } from '../../../shared/dto/orders/order-item.dto';
+import { OrderReceiverDetailDto } from '../../../shared/dto/orders/order-receiver.dto';
+import { OrderShippingDto } from '../../../shared/dto/orders/order-shipping.dto';
 
 class OrderPaymentDto {
   @IsString()

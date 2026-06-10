@@ -1,15 +1,18 @@
-import { Injectable } from "@nestjs/common";
-import { PassportStrategy } from "@nestjs/passport";
-import { ExtractJwt, Strategy } from "passport-jwt";
+import { Injectable } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
+import { ExtractJwt, Strategy } from 'passport-jwt';
 
 export type AccessJwtPayload = {
   sub: number;
   email: string;
-  role: "user" | "admin";
+  role: 'user' | 'admin';
 };
 
 @Injectable()
-export class JwtAccessStrategy extends PassportStrategy(Strategy, "jwt-access") {
+export class JwtAccessStrategy extends PassportStrategy(
+  Strategy,
+  'jwt-access',
+) {
   constructor() {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
