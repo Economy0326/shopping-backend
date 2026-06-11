@@ -11,7 +11,7 @@ import {
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { OptionalJwtAccessGuard } from '../auth/guards/optional-jwt-access.guard';
 import { User } from '../../shared/decorators/user.decorator';
-import type { CurrentUser } from '../../shared/current-user';
+import type { CurrentUser, QueryParams } from '../../shared/current-user';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { ReturnRequestDto } from './dto/return-request.dto';
@@ -31,7 +31,7 @@ export class OrdersController {
   // 회원의 내 주문 목록은 로그인 필요
   @UseGuards(JwtAccessGuard)
   @Get()
-  async list(@User() user: CurrentUser, @Query() query: any) {
+  async list(@User() user: CurrentUser, @Query() query: QueryParams) {
     return this.orders.list(user, query);
   }
 

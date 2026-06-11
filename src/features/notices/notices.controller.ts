@@ -14,13 +14,14 @@ import { NoticesService } from './notices.service';
 import { NoticeDto } from './dto/notice.dto';
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { AdminGuard } from '../../shared/guards/admin.guard';
+import type { QueryParams } from '../../shared/current-user';
 
 @Controller('notices')
 export class NoticesController {
   constructor(private readonly notices: NoticesService) {}
 
   @Get()
-  async list(@Query() query: any) {
+  async list(@Query() query: QueryParams) {
     return this.notices.list(query);
   }
 

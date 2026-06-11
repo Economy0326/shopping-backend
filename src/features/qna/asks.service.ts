@@ -4,64 +4,65 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AskStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parsePageSize } from '../../shared/pagination';
 import { makeId } from '../../shared/ids';
 import { emailToName } from '../../shared/name';
-import type { CurrentUser } from '../../shared/current-user';
+import type { CurrentUser, QueryParams } from '../../shared/current-user';
 import { ERR } from '../../shared/errors';
-import { AskStatus } from '@prisma/client';
 
 @Injectable()
 export class AsksService {
   constructor(private readonly prisma: PrismaService) {}
 
   private userId(user: CurrentUser): number | null {
-    const v = (user as any)?.sub;
-    const n = Number(v);
+    const n = Number(user.sub);
     return Number.isFinite(n) && n > 0 ? n : null;
   }
 
-  private isAdmin(user: CurrentUser) {
-    return String((user as any)?.role ?? '').toLowerCase() === 'admin';
+  private isAdmin(user: CurrentUser): boolean {
+    return user.role === 'admin';
   }
 
-  private toClientStatus(status: AskStatus | string | null | undefined) {
+  private toClientStatus(status: AskStatus | null | undefined) {
     return String(status ?? '').toLowerCase();
   }
 
-  async list(user: CurrentUser, query: any) {
+  async list(user: CurrentUser, query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 10, 100);
 
-    const where: any = { deletedAt: null };
+    const where: Prisma.AskWhereInput = { deletedAt: null };
 
-    // user는 본인만, admin은 전체
     if (!this.isAdmin(user)) {
       const uid = this.userId(user);
+
       if (uid === null) {
         throw new ForbiddenException({
           ...ERR.FORBIDDEN,
           details: { reason: 'Invalid_token_sub' },
-        } as any);
+        });
       }
+
       where.userId = uid;
     }
 
-    const raw = (query?.status ?? '').toString().trim();
-    const s = raw.toUpperCase();
+    const raw = String(query.status ?? '').trim();
+    const status = raw.toUpperCase();
 
     if (
-      s === AskStatus.WAITING ||
-      s === AskStatus.ANSWERED ||
-      s === AskStatus.CLOSED
+      status === AskStatus.WAITING ||
+      status === AskStatus.ANSWERED ||
+      status === AskStatus.CLOSED
     ) {
-      where.status = s as AskStatus;
+      where.status = status;
     }
 
-    // q search
-    const q = (query?.q ?? '').toString().trim();
-    if (q.length)
+    const q = String(query.q ?? '').trim();
+
+    if (q.length > 0) {
       where.OR = [{ title: { contains: q } }, { body: { contains: q } }];
+    }
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.ask.count({ where }),
@@ -84,7 +85,7 @@ export class AsksService {
     const data = rows.map((a) => ({
       id: a.id,
       title: a.title,
-      status: this.toClientStatus(a.status), // waiting, answered, closed
+      status: this.toClientStatus(a.status),
       createdAt: a.createdAt,
       authorId: a.userId,
       authorName: emailToName(a.user.email),
@@ -113,28 +114,34 @@ export class AsksService {
     });
 
     if (!row || row.deletedAt) {
-      throw new NotFoundException({ ...ERR.NOT_FOUND, details: { id } } as any);
+      throw new NotFoundException({
+        ...ERR.NOT_FOUND,
+        details: { id },
+      });
     }
 
     const isAdmin = this.isAdmin(user);
     const uid = this.userId(user);
+
     if (uid === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
         details: { reason: 'Invalid_token_sub' },
-      } as any);
+      });
     }
 
-    // 유저는 본인 글만
     if (!isAdmin && row.userId !== uid) {
-      throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
+      throw new ForbiddenException({
+        ...ERR.FORBIDDEN,
+        details: {},
+      });
     }
 
     return {
       id: row.id,
       title: row.title,
       body: row.body,
-      status: this.toClientStatus(row.status), // waiting, answered, closed
+      status: this.toClientStatus(row.status),
       createdAt: row.createdAt,
       authorId: row.userId,
       authorName: emailToName(row.user.email),
@@ -144,11 +151,12 @@ export class AsksService {
 
   async create(user: CurrentUser, dto: { title: string; body: string }) {
     const uid = this.userId(user);
+
     if (uid === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
         details: { reason: 'Invalid_token_sub' },
-      } as any);
+      });
     }
 
     const cnt = await this.prisma.ask.count({
@@ -163,6 +171,7 @@ export class AsksService {
     }
 
     const id = makeId('q');
+
     const created = await this.prisma.ask.create({
       data: {
         id,
@@ -180,27 +189,32 @@ export class AsksService {
 
   async reply(admin: CurrentUser, askId: string, body: string) {
     if (!this.isAdmin(admin)) {
-      throw new ForbiddenException({ ...ERR.ADMIN_ONLY, details: {} } as any);
+      throw new ForbiddenException({
+        ...ERR.ADMIN_ONLY,
+        details: {},
+      });
     }
 
     const ask = await this.prisma.ask.findUnique({
       where: { id: askId },
       select: { id: true, deletedAt: true },
     });
+
     if (!ask || ask.deletedAt) {
       throw new NotFoundException({
         ...ERR.NOT_FOUND,
         details: { id: askId },
-      } as any);
+      });
     }
 
     const id = makeId('r');
     const adminId = this.userId(admin);
+
     if (adminId === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
         details: { reason: 'Invalid_token_sub' },
-      } as any);
+      });
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -230,20 +244,27 @@ export class AsksService {
     });
 
     if (!ask || ask.deletedAt) {
-      throw new NotFoundException({ ...ERR.NOT_FOUND, details: { id } } as any);
+      throw new NotFoundException({
+        ...ERR.NOT_FOUND,
+        details: { id },
+      });
     }
 
     const isAdmin = this.isAdmin(user);
     const uid = this.userId(user);
+
     if (uid === null) {
       throw new ForbiddenException({
         ...ERR.FORBIDDEN,
         details: { reason: 'Invalid_token_sub' },
-      } as any);
+      });
     }
 
     if (!isAdmin && ask.userId !== uid) {
-      throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
+      throw new ForbiddenException({
+        ...ERR.FORBIDDEN,
+        details: {},
+      });
     }
 
     await this.prisma.ask.update({

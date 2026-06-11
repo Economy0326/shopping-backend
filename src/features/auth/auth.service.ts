@@ -9,11 +9,15 @@ import { ERR } from '../../shared/errors';
 import { setRefreshCookie, clearRefreshCookie } from './auth.cookies';
 import { ChangePasswordDto } from './dto/change-password.dto';
 
-// ✅ type은 클래스 밖에서 선언
+// type은 클래스 밖에서 선언
 type AccessPayload = { sub: number; email: string; role: 'user' | 'admin' };
 type RefreshPayload = { sub: number; tokenId: string };
+type PasswordResetPayload = {
+  sub: number;
+  type: 'pw-reset';
+};
 
-// ✅ "15m", "14d" 같은 env 값을 seconds(number)로 변환
+// "15m", "14d" 같은 env 값을 seconds(number)로 변환
 function parseExpiresToSeconds(input: string | undefined, fallbackSec: number) {
   if (!input) return fallbackSec;
   const m = input.trim().match(/^(\d+)\s*([smhd])$/i);
@@ -76,7 +80,7 @@ export class AuthService {
   }
 
   /**
-   * ✅ RefreshSession 기반 세션 발급 (유저당 1세션 전략)
+   *  RefreshSession 기반 세션 발급 (유저당 1세션 전략)
    * - 기존 active 세션은 revoke
    * - 새 refreshToken은 cookie에만 저장
    * - DB에는 hash만 저장
@@ -134,7 +138,7 @@ export class AuthService {
     await this.issueRefreshSession(user.id, refreshToken);
     setRefreshCookie(res, refreshToken);
 
-    // ✅ (인터셉터가 {data:...}로 감싸므로) 내부 payload는 그대로
+    // (인터셉터가 {data:...}로 감싸므로) 내부 payload는 그대로
     return { accessToken, user: { id: user.id, role: user.role } };
   }
 
@@ -172,7 +176,7 @@ export class AuthService {
     return { accessToken, user: { id: user.id, role: user.role } };
   }
 
-  async me(payload: { sub: number; email: string; role: 'user' | 'admin' }) {
+  me(payload: { sub: number; email: string; role: 'user' | 'admin' }) {
     return { id: payload.sub, email: payload.email, role: payload.role };
   }
 
@@ -186,7 +190,7 @@ export class AuthService {
       role: payload.role,
     });
 
-    // ✅ refresh 회전: 새 refresh 발급 + 기존 세션 revoke + 새 세션 create
+    // refresh 회전: 새 refresh 발급 + 기존 세션 revoke + 새 세션 create
     const newRefresh = await this.signRefresh(payload.sub);
     await this.issueRefreshSession(payload.sub, newRefresh);
     setRefreshCookie(res, newRefresh);
@@ -232,7 +236,7 @@ export class AuthService {
       data: { password: newHash },
     });
 
-    // ✅ 비번 변경 시 모든 refresh 세션 폐기
+    // 비번 변경 시 모든 refresh 세션 폐기
     await this.revokeAllRefreshSessions(userId);
 
     return true;
@@ -269,7 +273,7 @@ export class AuthService {
     res: Response,
   ) {
     try {
-      const payload: any = await this.jwt.verifyAsync(token, {
+      const payload = await this.jwt.verifyAsync<PasswordResetPayload>(token, {
         secret: process.env.JWT_PASSWORD_RESET_SECRET!,
       });
       if (!payload || payload.type !== 'pw-reset' || !payload.sub) {

@@ -8,7 +8,9 @@ export class OrdersMaintenance implements OnModuleInit {
 
   onModuleInit() {
     // 1분마다 돌림(개발/소규모)
-    setInterval(() => this.tick().catch(() => void 0), 60_000);
+    setInterval(() => {
+      void this.tick().catch(() => undefined);
+    }, 60_000);
   }
 
   private async tick() {

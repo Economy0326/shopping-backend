@@ -1,16 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parsePageSize } from '../../shared/pagination';
-import type { CurrentUser } from '../../shared/current-user';
+import { Prisma } from '@prisma/client';
+import type { CurrentUser, QueryParams } from '../../shared/current-user';
 
 @Injectable()
 export class ReturnsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(user: CurrentUser, query: any) {
+  async list(user: CurrentUser, query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
 
-    const where: any =
+    const where: Prisma.ReturnWhereInput =
       user.role === 'admin' ? {} : { order: { userId: user.sub } };
 
     const [total, rows] = await this.prisma.$transaction([

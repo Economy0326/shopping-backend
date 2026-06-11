@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -22,24 +24,24 @@ export class UsersService {
     });
   }
 
-  async updateProfile(userId: number, data: any) {
-    const allowed: any = {};
+  async updateProfile(userId: number, data: UpdateProfileDto) {
+    const allowed: Prisma.UserUpdateInput = {};
 
-    // ✅ 프론트는 name을 보냄 → displayName으로 매핑
-    const displayName = data?.displayName ?? data?.name ?? undefined;
+    const displayName = data.displayName ?? data.name ?? undefined;
     if (displayName !== undefined) allowed.displayName = displayName;
 
-    if (data?.phone !== undefined) allowed.phone = data.phone;
+    if (data.phone !== undefined) allowed.phone = data.phone;
 
-    if (data?.address) {
+    if (data.address) {
       if (data.address.zip !== undefined) allowed.defaultZip = data.address.zip;
-      if (data.address.address1 !== undefined)
+      if (data.address.address1 !== undefined) {
         allowed.defaultAddress1 = data.address.address1;
-      if (data.address.address2 !== undefined)
+      }
+      if (data.address.address2 !== undefined) {
         allowed.defaultAddress2 = data.address.address2;
+      }
     }
 
-    // ✅ 프론트가 setUser에 쓰기 좋게 전체 내려줌(추천)
     return this.prisma.user.update({
       where: { id: userId },
       data: allowed,

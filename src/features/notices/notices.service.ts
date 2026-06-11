@@ -4,12 +4,13 @@ import { parsePageSize } from '../../shared/pagination';
 import { makeId } from '../../shared/ids';
 import { ERR } from '../../shared/errors';
 import { NoticeDto } from './dto/notice.dto';
+import type { QueryParams } from '../../shared/current-user';
 
 @Injectable()
 export class NoticesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: any) {
+  async list(query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 10, 100);
 
     const [total, rows] = await this.prisma.$transaction([

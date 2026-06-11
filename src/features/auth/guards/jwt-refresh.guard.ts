@@ -1,19 +1,25 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { CurrentUser } from '../../../shared/current-user';
 
 @Injectable()
 export class JwtRefreshGuard extends AuthGuard('jwt-refresh') {
-  handleRequest(err: any, user: any) {
-    // Strategy에서 UnauthorizedException 던지면 err로 들어옴
+  handleRequest<TUser = CurrentUser>(
+    err: unknown,
+    user: TUser | false | null,
+  ): TUser {
     if (err) {
-      // 혹시 다른 계층에서 이상한 에러가 섞여도 refresh는 401로 통일
-      throw err instanceof UnauthorizedException
-        ? err
-        : new UnauthorizedException();
+      if (err instanceof UnauthorizedException) {
+        throw err;
+      }
+
+      throw new UnauthorizedException();
     }
+
     if (!user) {
       throw new UnauthorizedException();
     }
+
     return user;
   }
 }

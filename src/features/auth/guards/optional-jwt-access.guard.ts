@@ -1,11 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { CurrentUser } from '../../../shared/current-user';
 
 @Injectable()
 export class OptionalJwtAccessGuard extends AuthGuard('jwt-access') {
-  handleRequest(err: any, user: any) {
-    // 토큰이 없거나 만료/위조여도 throw 하지 않고 그냥 통과
-    if (err) return null;
-    return user ?? null;
+  handleRequest<TUser = CurrentUser | null>(
+    err: unknown,
+    user: TUser | false | null,
+  ): TUser {
+    if (err || !user) {
+      return null as TUser;
+    }
+
+    return user;
   }
 }

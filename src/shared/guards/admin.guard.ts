@@ -5,15 +5,18 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { ERR } from '../errors';
+import type { RequestWithUser } from '../current-user';
 
 @Injectable()
 export class AdminGuard implements CanActivate {
-  canActivate(ctx: ExecutionContext) {
-    const req = ctx.switchToHttp().getRequest();
+  canActivate(ctx: ExecutionContext): boolean {
+    const req = ctx.switchToHttp().getRequest<RequestWithUser>();
     const user = req.user;
+
     if (!user || user.role !== 'admin') {
-      throw new ForbiddenException({ ...ERR.ADMIN_ONLY, details: {} } as any);
+      throw new ForbiddenException({ ...ERR.ADMIN_ONLY, details: {} });
     }
+
     return true;
   }
 }

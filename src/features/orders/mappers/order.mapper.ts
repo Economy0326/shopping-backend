@@ -1,47 +1,37 @@
 import { OrderStatus, ReturnStatus } from '@prisma/client';
 import { emailToName } from '../../../shared/name';
 
-type AdminUser = {
-  id: number | string;
-  email: string;
-  displayName: string | null;
-  phone: string | null;
-} | null;
-
 type PrismaOrderListRow = {
   id: string;
-  userId?: number | null;
   status: OrderStatus;
   createdAt: Date;
   expiresAt: Date | null;
   grandTotal: number;
-
   paymentMethod: string;
   depositor: string | null;
-
   receiverName: string;
   receiverPhone: string;
   receiverEmail: string | null;
-
   carrier: string | null;
   trackingNo: string | null;
   shippedAt: Date | null;
   deliveredAt: Date | null;
-
-  user: AdminUser;
-
+  user: {
+    id: number;
+    email: string;
+    displayName: string | null;
+    phone: string | null;
+  } | null;
   items: Array<{
     name: string;
     thumbnailUrl: string | null;
     optionSummary: string | null;
   }>;
-
   _count: {
     items: number;
   };
-
   return: null | {
-    id: number | string;
+    id: number;
     status: ReturnStatus;
     reason: string | null;
     memo: string | null;
@@ -51,52 +41,47 @@ type PrismaOrderListRow = {
 
 type PrismaOrderDetailRow = {
   id: string;
-  userId?: number | null;
   status: OrderStatus;
   createdAt: Date;
   expiresAt: Date | null;
   shippedAt: Date | null;
   deliveredAt: Date | null;
   canceledAt: Date | null;
-
   paymentMethod: string;
   depositor: string | null;
-
   receiverName: string;
   receiverPhone: string;
   receiverEmail: string | null;
-
   zip: string;
   address1: string;
   address2: string;
   memo: string | null;
-
   carrier: string | null;
   trackingNo: string | null;
-
   grandTotal: number;
-
-  user: AdminUser;
-
+  user: {
+    id: number;
+    email: string;
+    displayName: string | null;
+    phone: string | null;
+  } | null;
   items: Array<{
     id: string;
-    productId: number | string;
-    variantId: number | string | null;
+    productId: number;
+    variantId: number | null;
     name: string;
     qty: number;
     price: number;
     thumbnailUrl: string | null;
     optionSummary: string | null;
   }>;
-
   return: null | {
-    id: number | string;
+    id: number;
     status: ReturnStatus;
     reason: string | null;
     memo: string | null;
     createdAt: Date;
   };
-
   refundLogs: Array<{
     id: string;
     amount: number;
@@ -109,9 +94,9 @@ export class OrderMapper {
   static toAdminListItem(o: PrismaOrderListRow) {
     const isGuestOrder = !o.user;
 
-    const buyerName = isGuestOrder
-      ? o.receiverName
-      : (o.user?.displayName ?? emailToName(o.user?.email ?? ''));
+    const buyerName = o.user
+      ? (o.user.displayName ?? emailToName(o.user.email))
+      : '비회원';
 
     return {
       id: o.id,
@@ -122,12 +107,14 @@ export class OrderMapper {
       isGuestOrder,
       ordererType: isGuestOrder ? 'guest' : 'member',
 
-      buyer: {
-        id: o.user?.id ?? null,
-        email: o.user?.email ?? o.receiverEmail ?? null,
-        name: buyerName,
-        phone: o.user?.phone ?? o.receiverPhone ?? null,
-      },
+      buyer: o.user
+        ? {
+            id: o.user.id,
+            email: o.user.email,
+            name: buyerName,
+            phone: o.user.phone ?? o.receiverPhone ?? null,
+          }
+        : null,
 
       receiver: {
         name: o.receiverName,
@@ -177,9 +164,9 @@ export class OrderMapper {
   static toAdminDetail(order: PrismaOrderDetailRow) {
     const isGuestOrder = !order.user;
 
-    const buyerName = isGuestOrder
-      ? order.receiverName
-      : (order.user?.displayName ?? emailToName(order.user?.email ?? ''));
+    const buyerName = order.user
+      ? (order.user.displayName ?? emailToName(order.user.email))
+      : '비회원';
 
     const itemsTotal = (order.items || []).reduce(
       (sum, it) => sum + it.price * it.qty,
@@ -199,12 +186,14 @@ export class OrderMapper {
       isGuestOrder,
       ordererType: isGuestOrder ? 'guest' : 'member',
 
-      buyer: {
-        id: order.user?.id ?? null,
-        email: order.user?.email ?? order.receiverEmail ?? null,
-        name: buyerName,
-        phone: order.user?.phone ?? order.receiverPhone ?? null,
-      },
+      buyer: order.user
+        ? {
+            id: order.user.id,
+            email: order.user.email,
+            name: buyerName,
+            phone: order.user.phone ?? order.receiverPhone ?? null,
+          }
+        : null,
 
       receiver: {
         name: order.receiverName,

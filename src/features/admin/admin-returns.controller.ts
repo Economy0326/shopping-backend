@@ -14,6 +14,7 @@ import { AdminGuard } from '../../shared/guards/admin.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parsePageSize } from '../../shared/pagination';
 import { ReturnStatus } from '@prisma/client';
+import type { QueryParams } from '../../shared/current-user';
 
 @UseGuards(JwtAccessGuard, AdminGuard)
 @Controller('admin/returns')
@@ -21,7 +22,7 @@ export class AdminReturnsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async list(@Query() query: any) {
+  async list(@Query() query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.return.count({}),

@@ -31,6 +31,6 @@ export class UsersController {
     @User() user: CurrentUser,
     @Body() dto: DefaultAddressDto,
   ) {
-    return this.users.setDefaultAddress(user.sub, dto as any);
+    return this.users.setDefaultAddress(user.sub, dto);
   }
 }

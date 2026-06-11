@@ -43,7 +43,7 @@ export class AuthController {
 
   @UseGuards(JwtAccessGuard)
   @Get('me')
-  async me(@User() user: CurrentUser) {
+  me(@User() user: CurrentUser) {
     return this.auth.me(user);
   }
 

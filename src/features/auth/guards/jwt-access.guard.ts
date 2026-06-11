@@ -1,16 +1,26 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { CurrentUser } from '../../../shared/current-user';
 
 @Injectable()
 export class JwtAccessGuard extends AuthGuard('jwt-access') {
-  handleRequest(err: any, user: any, info: any) {
-    // ✅ 여기서 passport-jwt가 왜 실패했는지 다 들어옴
+  handleRequest<TUser = CurrentUser>(
+    err: unknown,
+    user: TUser | false | null,
+    info: unknown,
+  ): TUser {
     if (err || info || !user) {
       console.error('[jwt-access] err:', err);
-      console.error('[jwt-access] info:', info); // <- TokenExpiredError, JsonWebTokenError 등
+      console.error('[jwt-access] info:', info);
       console.error('[jwt-access] user:', user);
-      throw err || new UnauthorizedException();
+
+      if (err instanceof Error) {
+        throw err;
+      }
+
+      throw new UnauthorizedException();
     }
+
     return user;
   }
 }

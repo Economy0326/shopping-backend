@@ -12,7 +12,7 @@ import {
 import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { AdminGuard } from '../../shared/guards/admin.guard';
 import { User } from '../../shared/decorators/user.decorator';
-import type { CurrentUser } from '../../shared/current-user';
+import type { CurrentUser, QueryParams } from '../../shared/current-user';
 import { AsksService } from './asks.service';
 import { AskDto } from './dto/ask.dto';
 import { ReplyDto } from './dto/reply.dto';
@@ -23,7 +23,7 @@ export class AsksController {
   constructor(private readonly asks: AsksService) {}
 
   @Get()
-  async list(@User() user: CurrentUser, @Query() query: any) {
+  async list(@User() user: CurrentUser, @Query() query: QueryParams) {
     return this.asks.list(user, query);
   }
 
@@ -38,7 +38,7 @@ export class AsksController {
     return this.asks.create(user, dto);
   }
 
-  // ✅ 관리자 reply (명세)
+  // 관리자 reply
   @UseGuards(AdminGuard)
   @Post(':id/replies')
   @HttpCode(200)
@@ -50,7 +50,7 @@ export class AsksController {
     return this.asks.reply(user, id, dto.body);
   }
 
-  // ✅ soft delete (본인 또는 admin)
+  // soft delete (본인 또는 admin)
   @Delete(':id')
   @HttpCode(200)
   async remove(@User() user: CurrentUser, @Param('id') id: string) {

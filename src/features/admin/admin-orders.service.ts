@@ -2,35 +2,23 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parsePageSize } from '../../shared/pagination';
 import { OrderMapper } from '../orders/mappers/order.mapper';
+import { Prisma, OrderStatus } from '@prisma/client';
+import type { QueryParams } from '../../shared/current-user';
+
+const ORDER_STATUSES = new Set<string>(Object.values(OrderStatus));
 
 @Injectable()
 export class AdminOrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: any) {
+  async list(query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
 
-    const where: any = {};
+    const where: Prisma.OrderWhereInput = {};
 
     const status = String(query?.status ?? '').trim();
-    if (status) {
-      where.status = status;
-    }
-
-    /**
-     * ordererType:
-     * - "" 또는 undefined: 전체
-     * - "member": 회원 주문만
-     * - "guest": 비회원 주문만
-     */
-    const ordererType = String(query?.ordererType ?? '').trim();
-
-    if (ordererType === 'member') {
-      where.userId = { not: null };
-    }
-
-    if (ordererType === 'guest') {
-      where.userId = null;
+    if (ORDER_STATUSES.has(status)) {
+      where.status = status as OrderStatus;
     }
 
     const q = String(query?.q ?? '').trim();
@@ -119,7 +107,7 @@ export class AdminOrdersService {
       }),
     ]);
 
-    const data = rows.map((o) => OrderMapper.toAdminListItem(o as any));
+    const data = rows.map((o) => OrderMapper.toAdminListItem(o));
 
     return {
       data,

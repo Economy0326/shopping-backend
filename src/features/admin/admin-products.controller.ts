@@ -15,6 +15,7 @@ import { JwtAccessGuard } from '../auth/guards/jwt-access.guard';
 import { AdminGuard } from '../../shared/guards/admin.guard';
 import { AdminUpsertProductDto } from './dto/admin-product.dto';
 import { AdminProductsService } from './admin-products.service';
+import type { QueryParams } from '../../shared/current-user';
 
 @UseGuards(JwtAccessGuard, AdminGuard)
 @Controller('admin/products')
@@ -23,7 +24,7 @@ export class AdminProductsController {
 
   /** 관리자 상품 목록 */
   @Get()
-  list(@Query() query: any) {
+  list(@Query() query: QueryParams) {
     return this.service.list(query);
   }
 

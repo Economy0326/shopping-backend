@@ -20,20 +20,22 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.enableCors({
-    origin: (requestOrigin, callback) => {
+    origin: (
+      requestOrigin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       if (!requestOrigin) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
       if (allowedOrigins.includes(requestOrigin)) {
-        return callback(null, true);
+        callback(null, true);
+        return;
       }
 
       console.error('[CORS] Blocked origin:', requestOrigin);
-      return callback(
-        new Error(`Not allowed by CORS: ${requestOrigin}`),
-        false,
-      );
+      callback(new Error(`Not allowed by CORS: ${requestOrigin}`), false);
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -63,4 +65,4 @@ async function bootstrap() {
   console.log(`🚀 API running on port ${port} (prefix: /api/v1)`);
   console.log('[CORS] allowed origins:', allowedOrigins);
 }
-bootstrap();
+void bootstrap();

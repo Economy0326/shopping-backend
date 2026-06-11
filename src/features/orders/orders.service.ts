@@ -5,13 +5,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { OrderStatus, ReturnStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ERR } from '../../shared/errors';
 import { makeId } from '../../shared/ids';
 import { parsePageSize } from '../../shared/pagination';
 import { CreateOrderDto } from './dto/create-order.dto';
-import type { CurrentUser } from '../../shared/current-user';
-import { OrderStatus, ReturnStatus } from '@prisma/client';
+import type { CurrentUser, QueryParams } from '../../shared/current-user';
+
+type TxClient = Prisma.TransactionClient;
 
 function addHours(d: Date, h: number) {
   return new Date(d.getTime() + h * 3600_000);
@@ -24,12 +26,12 @@ export class OrdersService {
   constructor(private readonly prisma: PrismaService) {}
 
   private toUserId(user: CurrentUser): number {
-    const n = Number((user as any).sub);
+    const n = Number(user.sub);
     return Number.isFinite(n) ? n : 0;
   }
 
   private isAdmin(user: CurrentUser | null): boolean {
-    return String((user as any)?.role ?? '').toLowerCase() === 'admin';
+    return user?.role === 'admin';
   }
 
   private normalizePhone(phone?: string | null): string {
@@ -50,7 +52,7 @@ export class OrdersService {
         throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
       }
 
-      if (String((user as any).sub) !== String(order.userId)) {
+      if (String(user.sub) !== String(order.userId)) {
         throw new ForbiddenException({ ...ERR.FORBIDDEN, details: {} } as any);
       }
 
@@ -71,7 +73,7 @@ export class OrdersService {
   }
 
   private async resolveVariantId(
-    tx: PrismaService,
+    tx: TxClient,
     params: { productId: number; optionValues: OptionValues },
   ) {
     const { productId } = params;
@@ -233,13 +235,13 @@ export class OrdersService {
       }> = [];
       for (const it of dto.items) {
         //  optionValues undefined 방지 + 레거시 options 흡수(원치 않으면 options 부분 제거)
-        const ovRaw = (it as any).optionValues ?? (it as any).options ?? {};
+        const ovRaw = it.optionValues ?? {};
         const optionValues: OptionValues = {
-          size: ovRaw?.size,
-          color: ovRaw?.color,
+          size: ovRaw.size,
+          color: ovRaw.color,
         };
 
-        const variantId = await this.resolveVariantId(tx as any, {
+        const variantId = await this.resolveVariantId(tx, {
           productId: it.productId,
           optionValues,
         });
@@ -387,10 +389,13 @@ export class OrdersService {
     });
   }
 
-  async list(user: CurrentUser, query: any) {
+  async list(user: CurrentUser, query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
-    const isAdmin = String((user as any)?.role ?? '').toLowerCase() === 'admin';
-    const where: any = isAdmin ? {} : { userId: this.toUserId(user) };
+    const isAdmin = this.isAdmin(user);
+
+    const where: Prisma.OrderWhereInput = isAdmin
+      ? {}
+      : { userId: this.toUserId(user) };
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.order.count({ where }),
@@ -406,7 +411,6 @@ export class OrdersService {
           expiresAt: true,
           grandTotal: true,
 
-          // 대표 상품 정보 (첫 번째 아이템)
           items: {
             take: 1,
             select: {
@@ -416,12 +420,10 @@ export class OrdersService {
             },
           },
 
-          // 아이템 개수용
           _count: {
             select: { items: true },
           },
 
-          // 반품 상태 표시용
           return: {
             select: {
               id: true,
@@ -449,12 +451,12 @@ export class OrdersService {
       },
 
       representativeItem: {
-        name: o.items?.[0]?.name ?? null,
-        thumbnailUrl: o.items?.[0]?.thumbnailUrl ?? null,
-        optionSummary: o.items?.[0]?.optionSummary ?? null,
+        name: o.items[0]?.name ?? null,
+        thumbnailUrl: o.items[0]?.thumbnailUrl ?? null,
+        optionSummary: o.items[0]?.optionSummary ?? null,
       },
 
-      itemsCount: o._count?.items ?? 0,
+      itemsCount: o._count.items,
 
       return: o.return
         ? {

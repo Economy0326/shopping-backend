@@ -16,18 +16,19 @@ import { OrderShipDto } from '../orders/dto/order-ship.dto';
 import { OrderStatus, ReturnStatus } from '@prisma/client';
 import { ERR } from '../../shared/errors';
 import { OrderMapper } from '../orders/mappers/order.mapper';
-import { AdminOrdersService } from './admin-orders.service'; // ✅ 추가
+import { AdminOrdersService } from './admin-orders.service';
+import type { QueryParams } from '../../shared/current-user';
 
 @UseGuards(JwtAccessGuard, AdminGuard)
 @Controller('admin/orders')
 export class AdminOrdersController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly adminOrdersService: AdminOrdersService, // ✅ 추가
+    private readonly adminOrdersService: AdminOrdersService,
   ) {}
 
   @Get()
-  async list(@Query() query: any) {
+  async list(@Query() query: QueryParams) {
     // 필터/검색 로직은 service로
     return this.adminOrdersService.list(query);
   }
@@ -55,7 +56,7 @@ export class AdminOrdersController {
       throw new HttpException({ ...ERR.ORDER_NOT_FOUND, details: { id } }, 404);
     }
 
-    return OrderMapper.toAdminDetail(order as any);
+    return OrderMapper.toAdminDetail(order);
   }
 
   @Post(':id/deposit-confirm')

@@ -2,9 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parsePageSize } from '../../shared/pagination';
 import { ERR } from '../../shared/errors';
+import { Prisma } from '@prisma/client';
+import type { QueryParams } from '../../shared/current-user';
 
 /**
- * ✅ 최종 확정(유저 상품 상세 명세 1:1)
+ *  최종 확정(유저 상품 상세 명세 1:1)
  * - images: string[] (url 배열)
  * - optionGroups: [{ key, label, options:[{ value, stock }] }]
  * - optionId/variantId/variants는 유저 응답에서 제거
@@ -13,13 +15,13 @@ import { ERR } from '../../shared/errors';
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(query: any) {
+  async list(query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
 
-    const category = String(query?.category ?? 'all');
-    const categoryId = query?.categoryId ? Number(query.categoryId) : null;
+    const category = String(query.category ?? 'all');
+    const categoryId = query.categoryId ? Number(query.categoryId) : null;
 
-    const where: any = { isActive: true };
+    const where: Prisma.ProductWhereInput = { isActive: true };
 
     if (categoryId) {
       const cat = await this.prisma.category.findUnique({
@@ -101,15 +103,15 @@ export class ProductsService {
     });
 
     if (!p || !p.categorySlug) {
-      throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} } as any);
+      throw new NotFoundException({ ...ERR.NOT_FOUND, details: {} });
     }
 
     const isLook = p.categorySlug === 'look';
 
-    // ✅ images: string[]
+    // images: string[]
     const images = (p.images || []).map((im) => im.url);
 
-    // ✅ option stock 계산 정책(운영 단순/안정)
+    // option stock 계산 정책(운영 단순/안정)
     // - 해당 옵션이 포함된 모든 variant stock 합(sum)
     const optionStockSum = new Map<number, number>();
     if (!isLook) {
@@ -130,7 +132,7 @@ export class ProductsService {
       }
     }
 
-    // ✅ optionGroups: value + stock만
+    // optionGroups: value + stock만
     const groupsMap = new Map<
       string,
       {

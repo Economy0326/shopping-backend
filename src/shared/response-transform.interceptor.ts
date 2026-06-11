@@ -6,15 +6,28 @@ import {
 } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
 
+type ResponsePayload<T> =
+  | {
+      data: T;
+      meta?: unknown;
+    }
+  | T;
+
 @Injectable()
-export class ResponseTransformInterceptor implements NestInterceptor {
-  intercept(_context: ExecutionContext, next: CallHandler): Observable<any> {
+export class ResponseTransformInterceptor<T> implements NestInterceptor<
+  T,
+  ResponsePayload<T>
+> {
+  intercept(
+    _context: ExecutionContext,
+    next: CallHandler<T>,
+  ): Observable<ResponsePayload<T>> {
     return next.handle().pipe(
-      map((payload) => {
-        // 이미 { data, meta } 형태면 그대로 반환
+      map((payload: T) => {
         if (payload && typeof payload === 'object' && 'data' in payload) {
-          return payload;
+          return payload as ResponsePayload<T>;
         }
+
         return { data: payload };
       }),
     );
