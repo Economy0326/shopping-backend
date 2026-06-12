@@ -391,11 +391,19 @@ export class OrdersService {
 
   async list(user: CurrentUser, query: QueryParams) {
     const { page, size, skip, take } = parsePageSize(query, 20, 100);
+
     const isAdmin = this.isAdmin(user);
 
-    const where: Prisma.OrderWhereInput = isAdmin
-      ? {}
-      : { userId: this.toUserId(user) };
+    const statusRaw = query?.status;
+    const status =
+      typeof statusRaw === 'string' && statusRaw in OrderStatus
+        ? (statusRaw as OrderStatus)
+        : undefined;
+
+    const where: Prisma.OrderWhereInput = {
+      ...(isAdmin ? {} : { userId: this.toUserId(user) }),
+      ...(status ? { status } : {}),
+    };
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.order.count({ where }),
@@ -409,8 +417,8 @@ export class OrdersService {
           status: true,
           createdAt: true,
           expiresAt: true,
+          canceledAt: true,
           grandTotal: true,
-
           items: {
             take: 1,
             select: {
@@ -419,11 +427,11 @@ export class OrdersService {
               optionSummary: true,
             },
           },
-
           _count: {
-            select: { items: true },
+            select: {
+              items: true,
+            },
           },
-
           return: {
             select: {
               id: true,
@@ -442,22 +450,19 @@ export class OrdersService {
       status: o.status,
       createdAt: o.createdAt.toISOString(),
       expiresAt: o.expiresAt ? o.expiresAt.toISOString() : null,
-
+      canceledAt: o.canceledAt ? o.canceledAt.toISOString() : null,
       amounts: {
         itemsTotal: o.grandTotal,
         shippingFee: 0,
         discountTotal: 0,
         grandTotal: o.grandTotal,
       },
-
       representativeItem: {
         name: o.items[0]?.name ?? null,
         thumbnailUrl: o.items[0]?.thumbnailUrl ?? null,
         optionSummary: o.items[0]?.optionSummary ?? null,
       },
-
       itemsCount: o._count.items,
-
       return: o.return
         ? {
             id: o.return.id,
@@ -469,7 +474,14 @@ export class OrdersService {
         : null,
     }));
 
-    return { data, meta: { page, size, total } };
+    return {
+      data,
+      meta: {
+        page,
+        size,
+        total,
+      },
+    };
   }
 
   async detail(user: CurrentUser | null, id: string, phone?: string) {

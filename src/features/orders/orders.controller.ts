@@ -28,6 +28,16 @@ export class OrdersController {
     return this.orders.create(user, dto);
   }
 
+  // 비회원 주문조회
+  @Post('guest/lookup')
+  @HttpCode(200)
+  async guestLookup(
+    @Body('orderId') orderId: string,
+    @Body('phone') phone: string,
+  ) {
+    return this.orders.detail(null, orderId, phone);
+  }
+
   // 회원의 내 주문 목록은 로그인 필요
   @UseGuards(JwtAccessGuard)
   @Get()
@@ -37,6 +47,8 @@ export class OrdersController {
 
   // 회원: 토큰으로 검증
   // 비회원: orderId + phone으로 검증
+
+  // 회원과 비회원이 주문 상세 조회 가능하도록 OptionalJwtAccessGuard 사용
   @UseGuards(OptionalJwtAccessGuard)
   @Get(':id')
   async detail(
@@ -50,40 +62,52 @@ export class OrdersController {
   // 회원: 토큰으로 검증
   // 비회원: orderId + phone으로 검증
   @UseGuards(OptionalJwtAccessGuard)
+  // 주문 배송 완료 확인 (회원/비회원 모두 가능)
   @Post(':id/confirm')
   @HttpCode(200)
   async confirm(
     @User() user: CurrentUser | null,
     @Param('id') id: string,
-    @Query('phone') phone?: string,
+    @Query('phone') queryPhone?: string,
+    @Body('phone') bodyPhone?: string,
   ) {
-    return this.orders.confirmDelivered(user, id, phone);
+    return this.orders.confirmDelivered(user, id, queryPhone ?? bodyPhone);
   }
 
   // 회원: 토큰으로 검증
   // 비회원: orderId + phone으로 검증
   @UseGuards(OptionalJwtAccessGuard)
+  // 주문 취소 요청 (회원/비회원 모두 가능)
   @Post(':id/cancel-request')
   @HttpCode(200)
   async cancel(
     @User() user: CurrentUser | null,
     @Param('id') id: string,
-    @Query('phone') phone?: string,
+    @Query('phone') queryPhone?: string,
+    @Body('phone') bodyPhone?: string,
   ) {
-    return this.orders.cancelRequest(user, id, phone);
+    return this.orders.cancelRequest(user, id, queryPhone ?? bodyPhone);
   }
 
   // 회원: 토큰으로 검증
   // 비회원: orderId + phone으로 검증
   @UseGuards(OptionalJwtAccessGuard)
+  // 주문 반품 요청 (회원/비회원 모두 가능)
   @Post(':id/return-request')
   @HttpCode(200)
   async returnReq(
     @User() user: CurrentUser | null,
     @Param('id') id: string,
     @Body() dto: ReturnRequestDto,
-    @Query('phone') phone?: string,
+    @Query('phone') queryPhone?: string,
+    @Body('phone') bodyPhone?: string,
   ) {
-    return this.orders.returnRequest(user, id, dto.reason, dto.memo, phone);
+    return this.orders.returnRequest(
+      user,
+      id,
+      dto.reason,
+      dto.memo,
+      queryPhone ?? bodyPhone,
+    );
   }
 }
