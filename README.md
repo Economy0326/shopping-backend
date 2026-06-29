@@ -2,18 +2,16 @@
 
 쇼핑몰 프로젝트에서 사용하는 NestJS 기반 백엔드 API 서버입니다.
 
-회원 인증, 상품, 주문, 반품, 공지, QnA, 관리자 운영 기능을 다룹니다.  
-프론트엔드와 맞춰 주문 생성, 비회원 주문 조회, 주문 상태 변경, 반품 처리까지 이어지는 흐름을 확인할 수 있습니다.
+회원 인증, 상품, 주문, 반품, 공지, QnA, 관리자 기능을 다룹니다.
 
-외부 PG 결제와 택배사 API 연동은 제외했습니다.  
-결제는 무통장 입금으로 두고, 배송은 관리자가 입금 확인 후 직접 처리하는 흐름입니다.
+프론트엔드와 연동해 회원/비회원 주문 생성, 주문 조회, 취소 요청, 반품 요청, 관리자 입금 확인과 배송 처리 흐름을 확인할 수 있도록 구성했습니다.
+
+외부 PG 결제와 택배사 API는 구현 범위에서 제외했습니다. 결제는 무통장 입금 기준으로 두고, 배송은 관리자가 입금 확인 후 직접 처리하는 흐름으로 정리했습니다.
 
 ## 관련 저장소
 
-| 구분 | 저장소 |
-| --- | --- |
-| Frontend | `shopping-frontend` |
-| Backend | `shopping-backend` |
+- Frontend: [shopping-frontend](https://github.com/Economy0326/shopping-frontend)
+- Backend: [shopping-backend](https://github.com/Economy0326/shopping-backend)
 
 ---
 
@@ -31,7 +29,7 @@
 | File Upload | Multer |
 | Storage | AWS S3 SDK |
 | Test | Jest, Supertest |
-| Deploy | Render 배포 기준|
+| Deploy | Render 배포 기준 |
 
 ---
 
