@@ -1,6 +1,6 @@
 # 🛒 Shopping Backend
 
-쇼핑몰 프로젝트에서 사용하는 NestJS 기반 백엔드 API 서버입니다.
+쇼핑몰 프론트엔드와 연동하기 위해 만든 NestJS 기반 백엔드 API 서버입니다.
 
 회원 인증, 상품, 주문, 반품, 공지, QnA, 관리자 기능을 다룹니다.
 
@@ -140,35 +140,25 @@ flowchart TD
 
 ## 인증 / 세션 정책
 
-Access Token은 프론트엔드 메모리에 두고, Refresh Token은 HttpOnly Cookie로 전달합니다.
+로그인 이후 인증이 필요한 요청은 Access Token을 사용하고, 로그인 유지는 Refresh Token Cookie를 기준으로 처리했습니다.
 
-### Access Token
-
-- 로그인 성공 시 발급
-- 프론트엔드 메모리에서 관리
-- 인증 요청 시 `Authorization: Bearer <token>` 형식으로 전달
-- localStorage / sessionStorage 저장을 전제로 하지 않음
-
-### Refresh Token
-
-- 서버에서 발급
-- HttpOnly Cookie로 전달
-- 프론트 JavaScript에서 접근 불가
-- DB에는 token hash만 저장
+- Access Token은 로그인 성공 시 발급
+- 인증 API 요청 시 `Authorization` 헤더로 전달
+- Refresh Token은 HttpOnly Cookie로 전달
+- Refresh Token 원본은 프론트엔드 JavaScript에서 접근하지 않음
+- DB에는 refresh token hash만 저장
 - 로그아웃 또는 재발급 시 기존 refresh session 정리
 
 ```mermaid
 sequenceDiagram
-  participant User as "User"
   participant FE as "Frontend"
   participant BE as "Backend"
   participant DB as "Database"
 
-  User->>FE: "로그인 요청"
   FE->>BE: "POST /auth/login"
   BE->>DB: "사용자 확인 / RefreshSession 저장"
-  BE-->>FE: "Access Token + HttpOnly Refresh Cookie"
-  FE->>BE: "Authorization: Bearer Access Token"
+  BE-->>FE: "Access Token + Refresh Cookie"
+  FE->>BE: "Authorization 헤더로 인증 요청"
   BE-->>FE: "인증 API 응답"
 ```
 
@@ -176,11 +166,12 @@ sequenceDiagram
 
 ## 토큰 갱신 정책
 
-일반 API 요청 중 401이 발생했을 때 refresh/retry가 반복되지 않도록 서버와 프론트의 역할을 나눴습니다.
+Access Token이 없는 상태로 앱에 진입하면 `/auth/refresh`를 한 번 시도합니다.
 
-- 일반 API 요청 중 401 발생 시 자동 refresh/retry 반복 금지
-- 앱 최초 진입 시 Access Token이 없을 때만 `/auth/refresh` 1회 시도
-- refresh 요청 시 `x-silent-auth: true` 헤더 사용
+일반 API 요청 중 401이 발생한 경우에는 자동 refresh/retry를 반복하지 않고, 프론트엔드에서 로그인 필요 상태로 처리하도록 했습니다.
+
+- 앱 최초 진입 시 refresh 1회 시도
+- 일반 API 요청 중 401 발생 시 Access Token 제거
 - refresh 실패 시 비로그인 상태 유지
 - 프론트엔드는 현재 화면을 유지하고 로그인 모달 표시
 
@@ -192,9 +183,8 @@ sequenceDiagram
 
   FE->>API: "일반 API 요청"
   API-->>FE: "401 Unauthorized"
-  FE->>Auth: "Access Token 제거"
-  Auth-->>FE: "AUTH_REQUIRED 이벤트"
-  FE-->>FE: "현재 화면 유지 + 로그인 모달 표시"
+  FE->>Auth: "로그인 필요 상태 처리"
+  Auth-->>FE: "로그인 모달 표시"
 ```
 
 ---
