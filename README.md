@@ -4,9 +4,13 @@
 
 회원 인증, 상품, 주문, 반품, 공지, QnA, 관리자 기능을 다룹니다.
 
-프론트엔드와 연동해 회원/비회원 주문 생성, 주문 조회, 취소 요청, 반품 요청, 관리자 입금 확인과 배송 처리 흐름을 확인할 수 있도록 구성했습니다.
+이 프로젝트에서는 상품 조회보다 주문 생성 이후의 상태 흐름에 더 집중했습니다.  
+회원/비회원 주문 생성, 주문 조회, 취소 요청, 반품 요청, 관리자 입금 확인, 배송 처리, 반품 승인/거절 흐름을 프론트엔드와 함께 확인할 수 있도록 구성했습니다.
 
-외부 PG 결제와 택배사 API는 구현 범위에서 제외했습니다. 결제는 무통장 입금 기준으로 두고, 배송은 관리자가 입금 확인 후 직접 처리하는 흐름으로 정리했습니다.
+외부 PG 결제와 택배사 API 연동은 구현 범위에서 제외했습니다.  
+결제는 무통장입금 기준으로 두고, 배송은 우체국 직접 발송을 가정한 관리자 수동 배송 처리 흐름으로 정리했습니다.
+
+---
 
 ## 관련 저장소
 
@@ -15,7 +19,7 @@
 
 ---
 
-## Tech Stack
+## 🧰 Tech Stack
 
 | 구분 | 기술 |
 | --- | --- |
@@ -23,17 +27,30 @@
 | Language | TypeScript |
 | Database | PostgreSQL |
 | ORM | Prisma |
-| Auth | JWT, Passport, Refresh Token Cookie |
-| Validation | class-validator, class-transformer |
+| Auth | JWT / Passport / Refresh Token Cookie |
+| Validation | class-validator / class-transformer |
 | Password | bcryptjs |
 | File Upload | Multer |
 | Storage | AWS S3 SDK |
-| Test | Jest, Supertest |
-| Deploy | Render 배포 기준 |
+| Test | Jest / Supertest 실행 환경 |
+| Build | Nest CLI |
 
 ---
 
-## 주요 기능
+## 📌 프로젝트 범위
+
+| 구분 | 내용 |
+| --- | --- |
+| 프로젝트 성격 | 개인 프로젝트 / 쇼핑몰 백엔드 API |
+| Frontend 연동 | shopping-frontend와 연동 |
+| 결제 기준 | 외부 PG 대신 무통장입금 기준 |
+| 배송 기준 | 택배사 API 대신 우체국 직접 발송을 가정한 관리자 수동 배송 처리 |
+| 핵심 구현 | 회원/비회원 주문, 주문 조회, 취소 요청, 반품 요청, 입금 확인, 배송 처리, 반품 승인/거절 |
+| 제외 범위 | 카드 PG 결제 연동, 택배사 API 연동, 이메일 발송 서비스 연동 |
+
+---
+
+## ✨ 주요 기능
 
 ### 사용자 / 인증
 
@@ -43,10 +60,10 @@
 - Refresh Token HttpOnly Cookie 발급
 - Access Token 재발급
 - 내 정보 조회
+- 회원 프로필 수정
+- 기본 배송지 저장
 - 비밀번호 변경
 - 비밀번호 재설정 요청 / 확인
-- 기본 배송지 저장
-- 회원 프로필 수정
 
 ### 상품 / 카테고리
 
@@ -66,18 +83,19 @@
 - 회원 주문 목록 조회
 - 주문 상세 조회
 - 비회원 주문 조회
-- 비회원 주문 취소 요청
-- 비회원 반품 요청
 - 배송 완료 확인
 - 주문 취소 요청
 - 반품 요청
-- 무통장 입금 기반 주문 상태 관리
+- 무통장입금 기반 주문 상태 관리
 - 주문 시점 상품 정보 스냅샷 저장
+- 주문 생성 시 재고 차감
+- 미입금 취소 시 재고 복구
 
 ### 반품 / 환불
 
-- 반품 요청 목록 조회
-- 반품 상세 조회
+- 내 반품 목록 조회
+- 내 반품 상세 조회
+- 관리자 반품 목록 조회
 - 관리자 반품 승인
 - 관리자 반품 거절
 - 환불 로그 생성
@@ -92,8 +110,10 @@
 - 주문 상세 조회
 - 입금 확인
 - 배송 처리
+- 배송 완료 처리
 - 반품 목록 조회
 - 반품 승인 / 거절
+- 환불 로그 생성
 - 공지 등록 / 수정 / 삭제
 - FAQ 정책 수정
 
@@ -107,21 +127,37 @@
 
 ---
 
-## 핵심 흐름
+## 📌 핵심 문제
 
-이 프로젝트에서 가장 신경 쓴 부분은 주문 이후의 상태 흐름입니다.
+쇼핑몰은 상품 목록, 장바구니, 주문 생성처럼 사용자에게 익숙한 흐름도 중요하지만, 실제 서비스처럼 동작하려면 주문 이후의 상태 변화가 더 중요하다고 생각했습니다.
 
-상품 조회나 장바구니 흐름은 프론트엔드에서 시작되지만, 주문 생성 이후에는 서버가 옵션 조합, 재고, 주문 상태를 일관되게 검증해야 합니다.
+특히 비회원 주문은 로그인 정보가 없기 때문에 주문 이후 조회, 취소 요청, 반품 요청을 어떤 기준으로 허용할지 정해야 했습니다.
 
-회원 주문은 Access Token 기준으로 사용자와 주문을 연결합니다.  
-비회원 주문은 계정이 없기 때문에 주문번호와 주문 시 입력한 휴대폰 번호를 기준으로 주문 조회, 취소 요청, 반품 요청을 처리합니다.
+또한 관리자는 주문 상태와 반품 상태를 빠르게 확인하고, 입금 확인, 배송 처리, 반품 승인/거절 같은 상태 변경 액션을 수행할 수 있어야 했습니다.
 
-결제와 배송은 외부 API를 붙이지 않고, 무통장 입금과 관리자 배송 처리 방식으로 범위를 정했습니다.  
-이 범위 안에서 주문 생성, 입금 확인, 배송 처리, 배송 완료, 취소 요청, 반품 요청까지의 운영 흐름에 집중했습니다.
+그래서 이 프로젝트에서는 단순 상품 CRUD보다 주문 생성 이후의 운영 흐름과 회원/비회원 주문 접근 기준을 명확히 정리하는 데 집중했습니다.
 
 ---
 
-## 전체 구조
+## 🧭 핵심 의사결정
+
+이 프로젝트에서는 모든 외부 연동을 한 번에 붙이기보다, 쇼핑몰의 주문 상태 흐름을 먼저 완성하는 방향으로 범위를 정했습니다.
+
+| 결정 | 이유 | API / 기능 반영 |
+| --- | --- | --- |
+| 무통장입금 기준 결제 | 외부 PG 연동보다 주문 상태 흐름을 먼저 검증하기 위해 | `AWAITING_DEPOSIT`, 입금 확인 API |
+| 우체국 직접 발송 기준 배송 | 택배사 API 연동 범위를 줄이고 운영 흐름을 먼저 구현하기 위해 | `SHIPPED`, `DELIVERED`, carrier / trackingNo 저장 |
+| 비회원 주문 허용 | 로그인하지 않은 사용자도 주문 이후 흐름을 이어갈 수 있게 하기 위해 | 주문번호 + 휴대폰 번호 검증 |
+| optionValues 기반 주문 | 프론트가 내부 variant 구조를 직접 알지 않도록 하기 위해 | 서버에서 option 조합과 재고 검증 |
+| 환불 로그 분리 | 반품 승인과 실제 환불 완료 시점을 분리하기 위해 | RefundLog 생성 후 `REFUNDED` 처리 |
+
+외부 PG와 택배사 API를 붙이면 결제/배송 연동 자체의 범위가 커질 수 있다고 판단했습니다.
+
+그래서 1차 구현에서는 무통장입금과 우체국 직접 발송을 가정한 관리자 수동 배송 처리 기준으로 결제/배송 정책을 확정하고, 그 기준 안에서 주문 생성, 주문 조회, 취소 요청, 반품 요청, 입금 확인, 배송 처리 흐름을 구현했습니다.
+
+---
+
+## 🧱 전체 구조
 
 ```mermaid
 flowchart TD
@@ -138,7 +174,7 @@ flowchart TD
 
 ---
 
-## 인증 / 세션 정책
+## 🔐 인증 / 세션 정책
 
 로그인 이후 인증이 필요한 요청은 Access Token을 사용하고, 로그인 유지는 Refresh Token Cookie를 기준으로 처리했습니다.
 
@@ -147,7 +183,8 @@ flowchart TD
 - Refresh Token은 HttpOnly Cookie로 전달
 - Refresh Token 원본은 프론트엔드 JavaScript에서 접근하지 않음
 - DB에는 refresh token hash만 저장
-- 로그아웃 또는 재발급 시 기존 refresh session 정리
+- 로그인 / 재발급 시 기존 active refresh session 정리
+- 로그아웃 / 비밀번호 변경 / 비밀번호 재설정 성공 시 refresh session 정리
 
 ```mermaid
 sequenceDiagram
@@ -156,7 +193,9 @@ sequenceDiagram
   participant DB as "Database"
 
   FE->>BE: "POST /auth/login"
-  BE->>DB: "사용자 확인 / RefreshSession 저장"
+  BE->>DB: "사용자 확인"
+  BE->>DB: "기존 RefreshSession revoke"
+  BE->>DB: "새 RefreshSession 저장"
   BE-->>FE: "Access Token + Refresh Cookie"
   FE->>BE: "Authorization 헤더로 인증 요청"
   BE-->>FE: "인증 API 응답"
@@ -164,16 +203,17 @@ sequenceDiagram
 
 ---
 
-## 토큰 갱신 정책
+## 🔁 토큰 갱신 정책
 
-Access Token이 없는 상태로 앱에 진입하면 `/auth/refresh`를 한 번 시도합니다.
+Access Token이 없는 상태로 앱에 진입하면 프론트엔드에서 `/auth/refresh`를 한 번 시도합니다.
 
 일반 API 요청 중 401이 발생한 경우에는 자동 refresh/retry를 반복하지 않고, 프론트엔드에서 로그인 필요 상태로 처리하도록 했습니다.
 
 - 앱 최초 진입 시 refresh 1회 시도
-- 일반 API 요청 중 401 발생 시 Access Token 제거
+- refresh 성공 시 새 Access Token 발급
+- refresh 시 새 Refresh Token 발급 및 기존 세션 revoke
+- 일반 API 요청 중 401 발생 시 프론트엔드는 로그인 필요 상태 처리
 - refresh 실패 시 비로그인 상태 유지
-- 프론트엔드는 현재 화면을 유지하고 로그인 모달 표시
 
 ```mermaid
 sequenceDiagram
@@ -187,18 +227,45 @@ sequenceDiagram
   Auth-->>FE: "로그인 모달 표시"
 ```
 
+이 방식은 일반 API 요청 중 refresh/retry가 반복되는 상황을 막고, 인증 만료 상황에서 사용자가 현재 화면을 유지한 채 다시 로그인할 수 있도록 하기 위한 선택입니다.
+
 ---
 
-## 비밀번호 재설정 범위
+## 🔑 Auth API
+
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| POST | `/api/v1/auth/register` | 회원가입 |
+| POST | `/api/v1/auth/login` | 로그인 |
+| POST | `/api/v1/auth/logout` | 로그아웃 |
+| POST | `/api/v1/auth/refresh` | Access Token 재발급 |
+| GET | `/api/v1/auth/me` | 현재 로그인 사용자 조회 |
+| POST | `/api/v1/auth/change-password` | 비밀번호 변경 |
+| POST | `/api/v1/auth/password-reset/request` | 비밀번호 재설정 요청 |
+| POST | `/api/v1/auth/password-reset/confirm` | 비밀번호 재설정 확인 |
+
+---
+
+## 👤 Users API
+
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| GET | `/api/v1/users/me` | 내 정보 조회 |
+| PATCH | `/api/v1/users/me/profile` | 프로필 수정 |
+| PUT | `/api/v1/users/default-address` | 기본 배송지 저장 |
+
+---
+
+## 🔒 비밀번호 재설정 범위
 
 비밀번호 재설정 요청과 확인 API 흐름은 구현했습니다.
 
 다만 이메일 발송 서비스 연동은 프로젝트 범위에서 제외했습니다.  
-개발 환경에서는 재설정 토큰을 서버 콘솔에서 확인합니다.
+개발 환경에서는 재설정 토큰을 서버 콘솔에서 확인하는 방식으로 처리했습니다.
 
 ---
 
-## CORS / API 공통 설정
+## 🌐 CORS / API 공통 설정
 
 서버는 `/api/v1` prefix를 기준으로 API를 제공합니다.
 
@@ -211,7 +278,7 @@ sequenceDiagram
 
 ---
 
-## 공통 응답 포맷
+## 📦 공통 응답 포맷
 
 프론트엔드에서 응답 구조를 일관되게 다룰 수 있도록 성공 응답은 `{ data }` 기준으로 맞췄습니다.
 
@@ -243,21 +310,23 @@ sequenceDiagram
   "error": {
     "code": "INVALID_OPTION_COMBINATION",
     "message": "선택한 옵션 조합이 존재하지 않습니다",
-    "details": {}
+    "details": {
+      "path": "/api/v1/orders"
+    }
   }
 }
 ```
 
 ### 응답 변환 규칙
 
-- 모든 성공 응답은 `{ data: ... }` 형태로 변환
-- 이미 `{ data }` 구조인 경우 그대로 유지
-- `{ id: ... }` 응답은 `{ data: { id: ... } }` 형태로 변환
-- 빈 값도 정상 응답일 수 있음
+- 이미 `{ data, meta }` 구조인 경우 그대로 반환
+- 그 외 성공 응답은 `{ data: payload }` 형태로 변환
+- 예외 응답은 `{ error: { code, message, details } }` 형태로 반환
+- validation error는 `VALIDATION_ERROR` 코드로 변환
 
 ---
 
-## 상품 / 카테고리 정책
+## 🛍️ 상품 / 카테고리 정책
 
 ### Categories
 
@@ -279,18 +348,20 @@ sequenceDiagram
 
 - `isActive=true` 상품만 노출
 - `category` 또는 `categoryId` 기준 필터 가능
-- 응답에는 `thumbnailUrl` 포함
+- 응답에는 대표 이미지 기준 `thumbnailUrl` 포함
+- 페이지네이션 응답은 `{ data, meta }` 구조 사용
 
 ### 상품 상세 정책
 
 - `images`는 URL 배열로 제공
-- `optionGroups.options[].stock` 기준으로 재고 표시
-- 프론트엔드가 직접 `variantId`를 결정하지 않도록 상세 응답에서 내부 variant 구조를 숨김
+- `optionGroups`는 `key`, `label`, `options` 구조로 제공
+- 각 option에는 `value`, `stock` 제공
+- 프론트엔드가 직접 `variantId`를 결정하지 않도록 사용자 상세 응답에서 내부 variant 구조를 숨김
 - `look` 카테고리는 옵션 그룹이 없을 수 있음
 
 ---
 
-## 회원 / 비회원 주문 생성
+## 🧾 회원 / 비회원 주문 생성
 
 주문은 회원과 비회원 모두 가능합니다.
 
@@ -333,28 +404,35 @@ flowchart TD
 
 ---
 
-## 옵션 조합 / 재고 검증
+## 🧩 옵션 조합 / 재고 검증
 
-프론트엔드는 주문 요청 시 `optionId`, `variantId`를 직접 보내지 않습니다.  
+프론트엔드는 주문 요청 시 `optionId`, `variantId`를 직접 보내지 않습니다.
+
 사용자가 선택한 옵션 값을 `optionValues` 형태로 전달하고, 서버가 실제 옵션 조합과 재고를 검증합니다.
 
 ### 처리 순서
 
 ```text
 1. productId 조회
-2. optionValues(groupKey, value) 기준 optionId 매핑
+2. optionValues 기준 optionId 매핑
 3. optionId 조합으로 variant 탐색
-4. 재고 확인
-5. 주문 확정
+4. variant가 해당 product 소속인지 확인
+5. 재고 확인
 6. 재고 차감
+7. 주문 시점 상품 정보 스냅샷 저장
+8. 주문 생성
 ```
 
-### 400 에러 조건
+### 에러 조건
 
-- `optionValues` 누락
-- 존재하지 않는 옵션
+- 주문 items가 비어 있음
+- 옵션이 있는 상품인데 optionValues가 없음
+- optionValues 값이 공백임
+- 존재하지 않는 옵션 값
 - 존재하지 않는 variant 조합
+- variant가 해당 product 소속이 아님
 - 재고 부족
+- 비활성 상품 주문 시도
 
 ### 주문 요청 예시
 
@@ -369,39 +447,55 @@ flowchart TD
         "color": "black"
       }
     }
-  ]
+  ],
+  "receiver": {
+    "name": "홍길동",
+    "phone": "01012345678",
+    "email": "user@example.com",
+    "address": {
+      "zip": "12345",
+      "address1": "서울시 어딘가",
+      "address2": "101호"
+    },
+    "memo": "문 앞에 놓아주세요"
+  },
+  "payment": {
+    "method": "BANK_TRANSFER",
+    "depositor": "홍길동"
+  }
 }
 ```
 
 ---
 
-## 무통장 입금 / 배송 운영 흐름
+## 💳 무통장입금 / 배송 운영 흐름
 
-현재 주문 결제 방식은 무통장 입금 기준입니다.  
+현재 주문 결제 방식은 무통장입금 기준입니다.
+
 카드 결제 PG와 택배사 API 연동은 1차 프로젝트 범위에서 제외했습니다.
 
 사용자가 주문을 생성하면 입금 대기 상태가 됩니다.  
 관리자가 입금을 확인하면 입금 확인 상태로 바뀌고, 이후 배송 정보를 등록하면 배송 중 상태가 됩니다.
 
 배송은 우체국 직접 발송을 가정했습니다.  
-서버에서는 배송 상태를 `SHIPPED`, `DELIVERED`로 변경하는 흐름에 집중했습니다.
+서버에서는 택배사 API를 호출하지 않고, 관리자 화면에서 입력한 `carrier`, `trackingNo`를 저장하고 주문 상태를 변경하는 흐름에 집중했습니다.
 
 ### 주문 상태
 
 | 상태 | 의미 |
 | --- | --- |
-| AWAITING_DEPOSIT | 입금 대기 |
-| DEPOSIT_CONFIRMED | 입금 확인 |
-| SHIPPED | 배송 중 |
-| DELIVERED | 배송 완료 |
-| CANCELED | 주문 취소 |
+| `AWAITING_DEPOSIT` | 입금 대기 |
+| `DEPOSIT_CONFIRMED` | 입금 확인 |
+| `SHIPPED` | 배송 중 |
+| `DELIVERED` | 배송 완료 |
+| `CANCELED` | 주문 취소 |
 
 ```mermaid
 flowchart LR
   A["주문 생성"] --> B["AWAITING_DEPOSIT"]
-  B --> C["입금 확인"]
+  B --> C["관리자 입금 확인"]
   C --> D["DEPOSIT_CONFIRMED"]
-  D --> E["배송 처리"]
+  D --> E["관리자 배송 처리"]
   E --> F["SHIPPED"]
   F --> G["배송 완료 / 구매 확정"]
   G --> H["DELIVERED"]
@@ -413,26 +507,27 @@ flowchart LR
 ### 미입금 취소
 
 - 입금 대기 상태의 주문은 취소 요청 가능
-- 취소 시 재고 복구
-- 관리자는 주문 상태를 기준으로 입금 확인 / 배송 처리 수행
+- 취소 시 주문 상태는 `CANCELED`로 변경
+- 취소 시 주문 생성 때 차감한 재고 복구
+- 입금 확인 이후에는 일반 취소 요청 불가
 
 ---
 
-## 반품 / 환불 운영 흐름
+## 🔁 반품 / 환불 운영 흐름
 
 반품은 배송 완료된 주문을 기준으로 요청할 수 있습니다.
 
 관리자는 반품 요청을 확인한 뒤 승인 또는 거절할 수 있습니다.  
-환불 로그가 생성되면 환불 완료 상태로 전환됩니다.
+승인된 반품에 대해 환불 로그를 생성하면 환불 완료 상태로 전환됩니다.
 
 ### 반품 상태
 
 | 상태 | 의미 |
 | --- | --- |
-| REQUESTED | 반품 요청 |
-| APPROVED | 반품 승인 |
-| REJECTED | 반품 거절 |
-| REFUNDED | 환불 완료 |
+| `REQUESTED` | 반품 요청 |
+| `APPROVED` | 반품 승인 |
+| `REJECTED` | 반품 거절 |
+| `REFUNDED` | 환불 완료 |
 
 ### 사용자 반품 API
 
@@ -446,8 +541,15 @@ flowchart LR
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
 | GET | `/api/v1/admin/returns` | 전체 반품 목록 조회 |
+| GET | `/api/v1/admin/returns/:id` | 반품 상세 조회 |
 | POST | `/api/v1/admin/returns/:id/approve` | 반품 승인 |
 | POST | `/api/v1/admin/returns/:id/reject` | 반품 거절 |
+
+### 관리자 환불 로그
+
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| POST | `/api/v1/admin/orders/:id/refund-log` | 환불 로그 생성 및 환불 완료 처리 |
 
 ```mermaid
 flowchart LR
@@ -466,59 +568,49 @@ flowchart LR
 - 미입금 취소 시 재고 복구
 - 반품 승인 단계에서는 재고 복구하지 않음
 - `REFUNDED` 전환 시 재고 복구
+- 환불 로그가 이미 있으면 중복 환불 처리 방지
 
 ---
 
-## 관리자 운영 API
+## 🛠️ 관리자 운영 API
 
 관리자 API에서는 상품, 주문, 반품, 공지, 업로드 기능을 다룹니다.
 
 ### 상품 관리
 
-- 상품 등록
-- 상품 수정
-- 상품 삭제
-- 이미지 등록
-- 옵션 / variant / 재고 관리
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| POST | `/api/v1/admin/products` | 상품 등록 |
+| PATCH | `/api/v1/admin/products/:id` | 상품 수정 |
+| DELETE | `/api/v1/admin/products/:id` | 상품 삭제 |
+
+### 이미지 업로드
+
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| POST | `/api/v1/admin/uploads` | 상품 이미지 업로드 |
 
 ### 주문 관리
 
-- 전체 주문 목록 조회
-- 주문 상세 조회
-- 입금 확인
-- 배송 처리
-- 주문 상태 관리
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| GET | `/api/v1/admin/orders` | 전체 주문 목록 조회 |
+| GET | `/api/v1/admin/orders/:id` | 주문 상세 조회 |
+| POST | `/api/v1/admin/orders/:id/deposit-confirm` | 입금 확인 |
+| POST | `/api/v1/admin/orders/:id/ship` | 배송 처리 |
+| POST | `/api/v1/admin/orders/:id/deliver` | 배송 완료 처리 |
+| POST | `/api/v1/admin/orders/:id/refund-log` | 환불 로그 생성 |
 
 ### 반품 관리
 
-- 전체 반품 목록 조회
-- 반품 상세 조회
-- 반품 승인
-- 반품 거절
-- 환불 처리
+| Method | Endpoint | 설명 |
+| --- | --- | --- |
+| GET | `/api/v1/admin/returns` | 전체 반품 목록 조회 |
+| GET | `/api/v1/admin/returns/:id` | 반품 상세 조회 |
+| POST | `/api/v1/admin/returns/:id/approve` | 반품 승인 |
+| POST | `/api/v1/admin/returns/:id/reject` | 반품 거절 |
 
 ### 공지 관리
-
-- 공지 등록
-- 공지 수정
-- 공지 삭제
-- 공지 목록 조회
-
-```mermaid
-flowchart TD
-  A["Admin"] --> B["상품 등록 / 수정"]
-  A --> C["주문 확인"]
-  A --> D["입금 확인"]
-  A --> E["배송 처리"]
-  A --> F["반품 승인 / 거절"]
-  A --> G["공지 관리"]
-```
-
----
-
-## 공지 / QnA / 시스템 정책
-
-### Notices
 
 | Method | Endpoint | 설명 |
 | --- | --- | --- |
@@ -528,12 +620,29 @@ flowchart TD
 | PATCH | `/api/v1/admin/notices/:id` | 관리자 공지 수정 |
 | DELETE | `/api/v1/admin/notices/:id` | 관리자 공지 삭제 |
 
+```mermaid
+flowchart TD
+  A["Admin"] --> B["상품 등록 / 수정"]
+  A --> C["주문 확인"]
+  A --> D["입금 확인"]
+  A --> E["배송 처리"]
+  A --> F["반품 승인 / 거절"]
+  A --> G["환불 로그 생성"]
+  A --> H["공지 관리"]
+```
+
+---
+
+## 💬 QnA / 시스템 정책
+
 ### QnA
 
-- 사용자는 본인 QnA만 조회 가능
+- 사용자는 QnA 작성 가능
+- 사용자는 본인 QnA 조회 가능
 - 관리자는 전체 QnA 조회 가능
 - QnA 상세는 작성자 또는 관리자만 접근 가능
-- 삭제는 soft delete 방식
+- QnA 삭제는 soft delete 방식
+- 관리자는 QnA 답변 작성 가능
 
 ### System Policy
 
@@ -555,7 +664,7 @@ flowchart TD
 
 ---
 
-## 데이터 모델 요약
+## 🗂️ 데이터 모델 요약
 
 Prisma schema 기준 주요 모델은 다음과 같습니다.
 
@@ -590,19 +699,26 @@ AskReply
 erDiagram
   User ||--o{ Order : creates
   User ||--o{ RefreshSession : has
+  User ||--o{ Ask : writes
+  User ||--o{ AskReply : writes
+
   Category ||--o{ Product : contains
+
   Product ||--o{ ProductImage : has
   Product ||--o{ ProductOption : has
   Product ||--o{ ProductVariant : has
+  Product ||--o{ OrderItem : ordered_as
+
+  Order ||--o{ OrderItem : contains
   Order ||--o| Return : has
   Order ||--o{ RefundLog : has
-  User ||--o{ Ask : writes
+
   Ask ||--o{ AskReply : has
 ```
 
 ---
 
-## 프로젝트 구조
+## 📁 프로젝트 구조
 
 ```text
 shopping-backend
@@ -617,10 +733,41 @@ shopping-backend
 ├─ src
 │  ├─ features
 │  │  ├─ admin
+│  │  │  ├─ dto
+│  │  │  ├─ admin-notices.controller.ts
+│  │  │  ├─ admin-orders.controller.ts
+│  │  │  ├─ admin-orders.service.ts
+│  │  │  ├─ admin-products.controller.ts
+│  │  │  ├─ admin-products.service.ts
+│  │  │  ├─ admin-returns.controller.ts
+│  │  │  ├─ admin-uploads.controller.ts
+│  │  │  └─ admin.module.ts
+│  │  │
 │  │  ├─ auth
+│  │  │  ├─ dto
+│  │  │  ├─ guards
+│  │  │  ├─ strategies
+│  │  │  ├─ auth.controller.ts
+│  │  │  ├─ auth.cookies.ts
+│  │  │  ├─ auth.module.ts
+│  │  │  └─ auth.service.ts
+│  │  │
 │  │  ├─ catalog
+│  │  │  ├─ categories.controller.ts
+│  │  │  ├─ categories.module.ts
+│  │  │  ├─ products.controller.ts
+│  │  │  ├─ products.module.ts
+│  │  │  └─ products.service.ts
+│  │  │
 │  │  ├─ notices
 │  │  ├─ orders
+│  │  │  ├─ dto
+│  │  │  ├─ mappers
+│  │  │  ├─ orders.controller.ts
+│  │  │  ├─ orders.maintenance.ts
+│  │  │  ├─ orders.module.ts
+│  │  │  └─ orders.service.ts
+│  │  │
 │  │  ├─ qna
 │  │  ├─ returns
 │  │  ├─ system
@@ -635,8 +782,11 @@ shopping-backend
 │  │  ├─ decorators
 │  │  ├─ guards
 │  │  ├─ app-error.ts
+│  │  ├─ current-user.ts
 │  │  ├─ errors.ts
 │  │  ├─ http-exception.filter.ts
+│  │  ├─ ids.ts
+│  │  ├─ name.ts
 │  │  ├─ pagination.ts
 │  │  └─ response-transform.interceptor.ts
 │  │
@@ -646,6 +796,9 @@ shopping-backend
 │  └─ main.ts
 │
 ├─ test
+│  ├─ app.e2e-spec.ts
+│  └─ jest-e2e.json
+│
 ├─ docker-compose.yml
 ├─ package.json
 └─ README.md
@@ -653,7 +806,7 @@ shopping-backend
 
 ---
 
-## 환경 변수
+## 🔧 환경 변수
 
 `.env` 파일을 생성하고 아래 값을 설정합니다.
 
@@ -704,7 +857,7 @@ AWS_SECRET_ACCESS_KEY=your_secret_key
 
 ---
 
-## 실행 방법
+## 🚀 실행 방법
 
 ```bash
 npm install
@@ -717,15 +870,9 @@ npm run start:dev
 http://localhost:8080/api/v1
 ```
 
-Health Check:
-
-```text
-GET http://localhost:8080/api/v1/health
-```
-
 ---
 
-## Prisma
+## 🗃️ Prisma
 
 ### Prisma Client 생성
 
@@ -753,7 +900,7 @@ npx prisma migrate deploy
 
 ---
 
-## 관리자 계정 생성
+## 🛠️ 관리자 계정 생성
 
 관리자 권한이 필요한 경우 스크립트를 사용해 관리자 계정을 생성하거나 권한을 변경합니다.
 
@@ -763,7 +910,7 @@ npm run make:admin
 
 ---
 
-## Build
+## 📦 Build
 
 ```bash
 npm run build
@@ -771,7 +918,7 @@ npm run build
 
 ---
 
-## Production 실행
+## 🚀 Production 실행
 
 ```bash
 npm run start:prod
@@ -779,7 +926,11 @@ npm run start:prod
 
 ---
 
-## Test
+## 🧪 Test
+
+테스트 실행 환경은 Jest와 Supertest 기준으로 구성되어 있습니다.
+
+현재 저장소에는 기본 e2e 테스트 파일이 포함되어 있으며, 주문/반품 정책 테스트를 별도로 강조할 만큼 확장한 상태는 아닙니다.
 
 ```bash
 npm test
@@ -793,9 +944,9 @@ npm run test:e2e
 
 ---
 
-## 배포 운영 기준
+## 🚢 배포 운영 기준
 
-Render 배포를 기준으로 아래 흐름을 사용합니다.
+Render 같은 Node 서버 배포 환경에서는 아래 흐름을 기준으로 운영할 수 있습니다.
 
 ### Build
 
@@ -827,13 +978,13 @@ npm run start:prod
 
 ---
 
-## Troubleshooting / Lessons Learned
+## 🧯 Troubleshooting / Lessons Learned
 
 ### 1. 인증 만료 처리 책임이 모호해지는 문제
 
 | 항목 | 내용 |
 | --- | --- |
-| Problem | 일반 API 요청 중 401이 발생했을 때 서버와 프론트가 각각 refresh/retry를 반복하면 인증 상태가 예측하기 어려워질 수 있었습니다. |
+| Problem | 일반 API 요청 중 401이 발생했을 때 프론트에서 자동 refresh/retry를 반복하면 인증 상태가 예측하기 어려워질 수 있었습니다. |
 | Cause | Access Token 만료, Refresh Token 존재 여부, 로그인 모달 표시 책임이 명확히 나뉘어 있지 않았습니다. |
 | Fix | 서버는 401을 명확히 반환하고, 프론트는 일반 API 요청 중 자동 refresh/retry를 반복하지 않도록 정책을 정리했습니다. 앱 최초 진입 시에만 refresh를 1회 시도하도록 분리했습니다. |
 | Result | 인증 만료 상황에서 현재 화면을 유지한 채 로그인 모달을 표시할 수 있고, 인증 상태 처리 흐름도 예측하기 쉬워졌습니다. |
@@ -845,7 +996,7 @@ npm run start:prod
 | Problem | 프론트에서 `variantId`를 직접 보내면 잘못된 옵션 조합이나 재고 상태를 신뢰하게 될 수 있었습니다. |
 | Cause | 옵션 조합과 재고는 서버 DB 기준으로 검증되어야 하지만, 프론트가 내부 variant 구조를 직접 알면 책임이 흐려질 수 있었습니다. |
 | Fix | 프론트는 `optionValues`만 보내고, 서버가 optionId 조합과 variant를 탐색한 뒤 재고를 검증하도록 정리했습니다. |
-| Result | 주문 가능 여부를 서버 기준으로 판단할 수 있게 되었고, 옵션 조합 오류와 재고 부족 상황을 일관된 에러로 처리할 수 있습니다. |
+| Result | 주문 가능 여부를 서버 기준으로 판단할 수 있게 되었고, 옵션 조합 오류와 재고 부족 상황을 일관된 에러로 처리할 수 있게 되었습니다. |
 
 ### 3. 회원 / 비회원 주문 이후 접근 기준이 모호해지는 문제
 
@@ -854,7 +1005,7 @@ npm run start:prod
 | Problem | 회원 주문과 비회원 주문은 사용자 식별 방식이 달라, 주문 생성 이후 조회/취소/반품 요청 기준이 필요했습니다. |
 | Cause | 회원은 Access Token 기준으로 본인 여부를 확인할 수 있지만, 비회원은 계정 정보가 없어 주문번호와 주문 시 입력한 휴대폰 번호를 기준으로 접근 권한을 확인해야 했습니다. |
 | Fix | 주문 생성 API는 Optional JWT 인증을 사용해 회원/비회원 모두 접근 가능하게 두고, 주문 상세/취소/반품 요청은 회원이면 Access Token 기준, 비회원이면 주문번호와 휴대폰 번호 기준으로 검증했습니다. |
-| Result | 로그인하지 않은 사용자도 주문할 수 있고, 주문 이후에도 주문번호와 휴대폰 번호로 주문 조회, 취소 요청, 반품 요청을 진행할 수 있습니다. |
+| Result | 로그인하지 않은 사용자도 주문할 수 있고, 주문 이후에도 주문번호와 휴대폰 번호로 주문 조회, 취소 요청, 반품 요청을 진행할 수 있게 되었습니다. |
 
 ### 4. 결제와 배송 연동 범위를 정하는 문제
 
@@ -862,5 +1013,5 @@ npm run start:prod
 | --- | --- |
 | Problem | 쇼핑몰 백엔드를 구현하면서 실제 카드 결제 PG와 택배사 API까지 연동해야 하는지 범위가 명확하지 않았습니다. |
 | Cause | 외부 결제/배송 연동까지 포함하면 API 정책과 주문 상태 흐름을 정리하기 전에 프로젝트 범위가 커질 수 있었습니다. |
-| Fix | 1차 구현에서는 결제는 무통장 입금, 배송은 관리자 배송 처리 방식으로 범위를 정했습니다. 실제 배송은 우체국 직접 발송을 가정하고, 백엔드에서는 입금 확인과 배송 상태 변경을 관리했습니다. |
-| Result | 외부 결제/배송 API 없이도 주문 생성, 입금 확인, 배송 처리, 배송 완료, 취소 요청, 반품 요청으로 이어지는 쇼핑몰 운영 흐름을 확인할 수 있습니다. |
+| Fix | 1차 구현에서는 결제는 무통장입금, 배송은 우체국 직접 발송을 가정한 관리자 수동 배송 처리 방식으로 범위를 정했습니다. 백엔드에서는 입금 확인과 배송 상태 변경을 관리했습니다. |
+| Result | 외부 결제/배송 API 없이도 주문 생성, 입금 확인, 배송 처리, 배송 완료, 취소 요청, 반품 요청으로 이어지는 쇼핑몰 운영 흐름을 확인할 수 있었습니다. |
