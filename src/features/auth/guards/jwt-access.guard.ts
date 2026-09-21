@@ -10,10 +10,6 @@ export class JwtAccessGuard extends AuthGuard('jwt-access') {
     info: unknown,
   ): TUser {
     if (err || info || !user) {
-      console.error('[jwt-access] err:', err);
-      console.error('[jwt-access] info:', info);
-      console.error('[jwt-access] user:', user);
-
       if (err instanceof Error) {
         throw err;
       }

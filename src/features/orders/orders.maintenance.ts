@@ -28,11 +28,13 @@ export class OrdersMaintenance implements OnModuleInit {
 
     for (const o of targets) {
       await this.prisma.$transaction(async (tx) => {
-        // 이미 누가 바꿨으면 스킵
-        const cur = await tx.order.findUnique({ where: { id: o.id } });
-        if (!cur || cur.status !== OrderStatus.AWAITING_DEPOSIT) return;
+        const canceled = await tx.order.updateMany({
+          where: { id: o.id, status: OrderStatus.AWAITING_DEPOSIT },
+          data: { status: OrderStatus.CANCELED, canceledAt: new Date() },
+        });
+        if (canceled.count !== 1) return;
 
-        // 재고 복구
+        // 상태 전이를 선점한 작업만 재고를 복구한다.
         for (const it of o.items) {
           if (it.variantId) {
             await tx.productVariant.update({
@@ -41,11 +43,6 @@ export class OrdersMaintenance implements OnModuleInit {
             });
           }
         }
-
-        await tx.order.update({
-          where: { id: o.id },
-          data: { status: OrderStatus.CANCELED, canceledAt: new Date() },
-        });
       });
     }
   }

@@ -205,6 +205,22 @@ export class AdminOrdersController {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      const refunded = await tx.return.updateMany({
+        where: { id: order.return!.id, status: ReturnStatus.APPROVED },
+        data: { status: ReturnStatus.REFUNDED },
+      });
+
+      if (refunded.count !== 1) {
+        throw new HttpException(
+          {
+            code: 'REFUND_ALREADY_PROCESSED',
+            message: '이미 환불 처리된 주문입니다',
+            details: { id },
+          },
+          409,
+        );
+      }
+
       await tx.refundLog.create({
         data: {
           orderId: id,
@@ -223,11 +239,6 @@ export class AdminOrdersController {
           });
         }
       }
-
-      await tx.return.update({
-        where: { id: order.return!.id },
-        data: { status: ReturnStatus.REFUNDED },
-      });
     });
 
     return true;

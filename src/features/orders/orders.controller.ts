@@ -20,7 +20,6 @@ import { ReturnRequestDto } from './dto/return-request.dto';
 export class OrdersController {
   constructor(private readonly orders: OrdersService) {}
 
-  // 회원 + 비회원 주문 생성 가능
   @UseGuards(OptionalJwtAccessGuard)
   @Post()
   @HttpCode(200)
@@ -28,7 +27,6 @@ export class OrdersController {
     return this.orders.create(user, dto);
   }
 
-  // 비회원 주문조회
   @Post('guest/lookup')
   @HttpCode(200)
   async guestLookup(
@@ -38,17 +36,12 @@ export class OrdersController {
     return this.orders.detail(null, orderId, phone);
   }
 
-  // 회원의 내 주문 목록은 로그인 필요
   @UseGuards(JwtAccessGuard)
   @Get()
   async list(@User() user: CurrentUser, @Query() query: QueryParams) {
     return this.orders.list(user, query);
   }
 
-  // 회원: 토큰으로 검증
-  // 비회원: orderId + phone으로 검증
-
-  // 회원과 비회원이 주문 상세 조회 가능하도록 OptionalJwtAccessGuard 사용
   @UseGuards(OptionalJwtAccessGuard)
   @Get(':id')
   async detail(
@@ -59,10 +52,7 @@ export class OrdersController {
     return this.orders.detail(user, id, phone);
   }
 
-  // 회원: 토큰으로 검증
-  // 비회원: orderId + phone으로 검증
   @UseGuards(OptionalJwtAccessGuard)
-  // 주문 배송 완료 확인 (회원/비회원 모두 가능)
   @Post(':id/confirm')
   @HttpCode(200)
   async confirm(
@@ -74,10 +64,7 @@ export class OrdersController {
     return this.orders.confirmDelivered(user, id, queryPhone ?? bodyPhone);
   }
 
-  // 회원: 토큰으로 검증
-  // 비회원: orderId + phone으로 검증
   @UseGuards(OptionalJwtAccessGuard)
-  // 주문 취소 요청 (회원/비회원 모두 가능)
   @Post(':id/cancel-request')
   @HttpCode(200)
   async cancel(
@@ -89,10 +76,7 @@ export class OrdersController {
     return this.orders.cancelRequest(user, id, queryPhone ?? bodyPhone);
   }
 
-  // 회원: 토큰으로 검증
-  // 비회원: orderId + phone으로 검증
   @UseGuards(OptionalJwtAccessGuard)
-  // 주문 반품 요청 (회원/비회원 모두 가능)
   @Post(':id/return-request')
   @HttpCode(200)
   async returnReq(

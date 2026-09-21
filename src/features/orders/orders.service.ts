@@ -626,6 +626,28 @@ export class OrdersService {
     }
 
     await this.prisma.$transaction(async (tx) => {
+      const canceled = await tx.order.updateMany({
+        where: { id, status: OrderStatus.AWAITING_DEPOSIT },
+        data: { status: OrderStatus.CANCELED, canceledAt: new Date() },
+      });
+
+      if (canceled.count !== 1) {
+        const current = await tx.order.findUnique({
+          where: { id },
+          select: { status: true },
+        });
+
+        if (current?.status === OrderStatus.CANCELED) return;
+
+        throw new HttpException(
+          {
+            ...ERR.INVALID_ORDER_STATUS,
+            details: { status: current?.status },
+          },
+          400,
+        );
+      }
+
       for (const it of order.items) {
         if (it.variantId) {
           await tx.productVariant.update({
@@ -635,10 +657,6 @@ export class OrdersService {
         }
       }
 
-      await tx.order.update({
-        where: { id },
-        data: { status: OrderStatus.CANCELED, canceledAt: new Date() },
-      });
     });
 
     return true;

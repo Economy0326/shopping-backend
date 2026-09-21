@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import type { Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -66,7 +67,7 @@ export class AuthService {
   private async signRefresh(userId: number) {
     const payload: RefreshPayload = {
       sub: userId,
-      tokenId: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      tokenId: randomUUID(),
     };
     const expiresInSec = parseExpiresToSeconds(
       process.env.REFRESH_EXPIRES_IN,
@@ -261,8 +262,6 @@ export class AuthService {
         expiresIn: expiresInSec,
       },
     );
-
-    console.log('[password-reset] token for:', user.email, token);
 
     return true;
   }
